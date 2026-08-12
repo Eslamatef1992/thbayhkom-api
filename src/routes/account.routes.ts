@@ -48,7 +48,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return fail(res, 400, 'Email and password are required');
   const user = await User.findOne({ where: { email } });
-  if (!user || !(await comparePassword(password, (user as any).password_hash))) {
+  if (!user || !(await comparePassword(password, (user as any).password))) {
     return fail(res, 401, 'Invalid email or password');
   }
   const token = signToken((user as any).id);
@@ -64,8 +64,8 @@ router.post('/signUp', asyncHandler(async (req, res) => {
   const exists = await User.findOne({ where: { email } });
   if (exists) return fail(res, 409, 'Email already registered');
   const user = await User.create({
-    name, email, mobile, password_hash: await hashPassword(password),
-    role: 'customer', is_verified: 1, status: 'active',
+    name, email, mobile, password: await hashPassword(password),
+    is_verified: 1, status: 'active',
   });
   const token = signToken((user as any).id);
   ok(res, { user: presentUser(user, token) }, 'Registered');
@@ -82,7 +82,7 @@ router.post('/socialSignUp', asyncHandler(async (req, res) => {
     return ok(res, { user: presentUser(user, token) }, 'Logged in');
   }
   if (!user) {
-    await User.create({ email, social_type, status: 'active', is_verified: 1, role: 'customer' });
+    await User.create({ email, social_type, status: 'active', is_verified: 1 });
   }
   fail(res, 222, 'Please complete your profile');
 }));
@@ -92,7 +92,7 @@ router.post('/socialCreateNewAccount', asyncHandler(async (req, res) => {
   const email = await verifySocial(social_type, social_token);
   if (!email) return fail(res, 401, 'Invalid social token');
   let user = await User.findOne({ where: { email } });
-  if (!user) user = await User.create({ email, social_type, role: 'customer', status: 'active', is_verified: 1 });
+  if (!user) user = await User.create({ email, social_type, status: 'active', is_verified: 1 });
   (user as any).mobile = mobile;
   await user.save();
   const token = signToken((user as any).id);
@@ -109,7 +109,7 @@ router.post('/checkAppleAccount', asyncHandler(async (req, res) => {
     return ok(res, { user: presentUser(user, token) }, 'Logged in');
   }
   if (!user) {
-    await User.create({ email: resolvedEmail, name, social_type: 'apple', role: 'customer', status: 'active', is_verified: 1 });
+    await User.create({ email: resolvedEmail, name, social_type: 'apple', status: 'active', is_verified: 1 });
   }
   fail(res, 222, 'Please complete your profile');
 }));
@@ -118,7 +118,7 @@ router.post('/appleCreateNewAccount', asyncHandler(async (req, res) => {
   const { apple_token, email, mobile, name } = req.body;
   const resolvedEmail = email || `${apple_token}@apple.local`;
   let user = await User.findOne({ where: { email: resolvedEmail } });
-  if (!user) user = await User.create({ email: resolvedEmail, name, social_type: 'apple', role: 'customer', status: 'active', is_verified: 1 });
+  if (!user) user = await User.create({ email: resolvedEmail, name, social_type: 'apple', status: 'active', is_verified: 1 });
   (user as any).mobile = mobile;
   if (name) (user as any).name = name;
   await user.save();
@@ -133,11 +133,11 @@ router.post('/forgotPassword', asyncHandler(async (_req, res) => {
 // --- Authenticated account management ---
 router.post('/changePassword', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
   const { old_password, password, confirm_password } = req.body;
-  if (!(await comparePassword(old_password, req.authUser.password_hash))) {
+  if (!(await comparePassword(old_password, req.authUser.password))) {
     return fail(res, 422, 'Old password is incorrect');
   }
   if (password !== confirm_password) return fail(res, 400, 'Passwords do not match');
-  req.authUser.password_hash = await hashPassword(password);
+  req.authUser.password = await hashPassword(password);
   await req.authUser.save();
   ok(res, {}, 'Password changed');
 }));

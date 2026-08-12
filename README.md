@@ -16,6 +16,23 @@ npm run seed                # creates schema + admin user + demo data
 npm run dev                 # http://localhost:3000/api
 ```
 
+## Database (aligned to the leader's Laravel schema)
+The models now match the leader's schema in `thabayehkom-backend-database/`:
+- Names/descriptions live in `*_translations` tables (en/ar). The API resolves them per request
+  `Accept-Language` and still returns the flat `name`/`description`/`title` keys the Flutter app expects — mobile request/response shapes are unchanged.
+- Separate `admins` table (not app `users`) with `roles` + `permissions` + `role_permissions`.
+- `product_categories` pivot, `user_addresses`, `notify` + `notify_translations`, soft deletes (`deleted_at`).
+- Cities table holds governorates (`parent_id` null) and cities.
+
+Set Postgres in `.env`:
+```
+DB_DIALECT=postgres
+DATABASE_URL=postgres://thabayehkom_user:password@127.0.0.1:5432/thabayehkom_db
+```
+For dev, `DB_SYNC=true` lets Sequelize create/adjust tables. For production, create the schema from the
+leader's `thabayehkom-backend-database/DATABASE_COMPLETE.sql` (or Laravel migrations) and set `DB_SYNC=false`,
+then run `npm run seed` to load the initial admin + base data.
+
 ## File uploads
 Any authenticated user (customer or admin) can upload images. Files are stored in `UPLOAD_DIR`
 (default `./uploads`) and served statically at `/uploads/<filename>`.

@@ -1,6 +1,7 @@
-import { presentProduct } from './catalog';
+import { presentProduct, presentCountry, presentCity } from './catalog';
+import { tr } from '../db/models';
 
-export function presentSetting(s: any, pages: any[], cutTypes: any[], serviceTypes: any[]) {
+export function presentSetting(s: any, pages: any[], cutTypes: any[], serviceTypes: any[], lang = 'en') {
   if (!s) return null;
   return {
     id: s.id,
@@ -32,7 +33,7 @@ export function presentSetting(s: any, pages: any[], cutTypes: any[], serviceTyp
     image: s.image,
     banner_image: s.banner_image,
     banner_link: s.banner_link,
-    paginateTotal: s.paginateTotal,
+    paginateTotal: s.paginate_total,
     admin_commission_parcent: s.admin_commission_parcent,
     is_maintenance_mode: s.is_maintenance_mode,
     is_alowed_register: s.is_alowed_register,
@@ -42,23 +43,24 @@ export function presentSetting(s: any, pages: any[], cutTypes: any[], serviceTyp
     account_need_to_activate: s.account_need_to_activate,
     created_at: s.created_at,
     updated_at: s.updated_at,
-    title: s.title,
-    description: s.description,
-    address: s.address,
+    title: tr(s.translations, lang, 'title'),
+    description: tr(s.translations, lang, 'description'),
+    address: tr(s.translations, lang, 'address'),
     pages: (pages || []).map((p: any) => ({
       id: p.id,
       slug: p.slug,
       image: p.image,
       views: p.views,
       created_at: p.created_at,
-      title: p.title,
-      description: p.description,
-      key_words: p.key_words,
+      title: tr(p.translations, lang, 'title'),
+      description: tr(p.translations, lang, 'description'),
+      key_words: tr(p.translations, lang, 'key_words'),
     })),
-    cutTypes: (cutTypes || []).map((t: any) => ({ id: t.id, status: t.status, created_at: t.created_at, name: t.name })),
-    serviceTypes: (serviceTypes || []).map((t: any) => ({ id: t.id, status: t.status, created_at: t.created_at, name: t.name })),
+    cutTypes: (cutTypes || []).map((t: any) => ({ id: t.id, status: t.status, created_at: t.created_at, name: tr(t.translations, lang) })),
+    serviceTypes: (serviceTypes || []).map((t: any) => ({ id: t.id, status: t.status, created_at: t.created_at, name: tr(t.translations, lang) })),
   };
 }
+
 
 export function presentAdvertisement(a: any) {
   if (!a) return null;
@@ -74,7 +76,7 @@ export function presentAdvertisement(a: any) {
   };
 }
 
-export function presentAddress(a: any) {
+export function presentAddress(a: any, lang = 'en') {
   return {
     id: a.id,
     user_id: a.user_id,
@@ -82,9 +84,9 @@ export function presentAddress(a: any) {
     country_id: a.country_id,
     city_id: a.city_id,
     governorate_id: a.governorate_id,
-    country: a.country || null,
-    city: a.city || null,
-    governorate: a.governorate || null,
+    country: a.country ? presentCountry(a.country, lang) : null,
+    city: a.city ? presentCity(a.city, lang) : null,
+    governorate: a.governorate ? presentCity(a.governorate, lang) : null,
     block: a.block,
     street: a.street,
     avenue: a.avenue,
@@ -104,11 +106,11 @@ export function presentAddress(a: any) {
 }
 
 
-function typeShape(t: any) {
-  return t ? { id: t.id, status: t.status, created_at: t.created_at, name: t.name } : null;
+function typeShape(t: any, lang = 'en') {
+  return t ? { id: t.id, status: t.status, created_at: t.created_at, name: tr(t.translations, lang) } : null;
 }
 
-export function presentCartItem(c: any) {
+export function presentCartItem(c: any, lang = 'en') {
   return {
     id: c.id,
     user_id: c.user_id,
@@ -120,22 +122,24 @@ export function presentCartItem(c: any) {
     country_id: c.country_id,
     special_request: c.special_request,
     created_at: c.created_at,
-    product: c.product ? presentProduct(c.product) : null,
-    cut_type: typeShape(c.cut_type),
-    service_type: typeShape(c.service_type),
+    product: c.product ? presentProduct(c.product, { lang }) : null,
+    cut_type: typeShape(c.cut_type, lang),
+    service_type: typeShape(c.service_type, lang),
   };
 }
+
+const num = (v: any) => (v == null ? v : Number(v));
 
 export function presentOrder(o: any) {
   return {
     id: o.id,
     user_id: o.user_id,
-    total_price: o.total_price,
+    total_price: num(o.total_price),
     address_id: o.address_id,
-    discount: o.discount,
-    delivery_cost: o.delivery_cost,
+    discount: num(o.discount),
+    delivery_cost: num(o.delivery_cost),
     discount_code: o.discount_code,
-    sub_total: o.sub_total,
+    sub_total: num(o.sub_total),
     count_items: o.count_items,
     fcm_token: o.fcm_token,
     name: o.name,
@@ -155,7 +159,7 @@ export function presentOrder(o: any) {
   };
 }
 
-export function presentOrderDetails(o: any) {
+export function presentOrderDetails(o: any, lang = 'en') {
   return {
     ...presentOrder(o),
     products: (o.products || []).map((op: any) => ({
@@ -166,13 +170,13 @@ export function presentOrderDetails(o: any) {
       service_type_id: op.service_type_id,
       special_request: op.special_request,
       quantity: op.quantity,
-      discount: op.discount,
-      price: op.price,
-      offer_price: op.offer_price,
+      discount: num(op.discount),
+      price: num(op.price),
+      offer_price: num(op.offer_price),
       created_at: op.created_at,
-      product: op.product ? presentProduct(op.product) : null,
-      service_type: typeShape(op.service_type),
-      cut_type: typeShape(op.cut_type),
+      product: op.product ? presentProduct(op.product, { lang }) : null,
+      service_type: typeShape(op.service_type, lang),
+      cut_type: typeShape(op.cut_type, lang),
     })),
     address: o.address ? presentAddress(o.address) : null,
   };
@@ -192,7 +196,7 @@ export function presentPromotionCode(p: any) {
   };
 }
 
-export function presentNotification(n: any) {
+export function presentNotification(n: any, lang = 'en') {
   return {
     id: n.id,
     user_id: n.user_id,
@@ -200,7 +204,8 @@ export function presentNotification(n: any) {
     messag_type: n.messag_type,
     status: n.status,
     created_at: n.created_at,
-    message: n.message,
-    title: n.title,
+    message: tr(n.translations, lang, 'message'),
+    title: tr(n.translations, lang, 'title'),
   };
 }
+

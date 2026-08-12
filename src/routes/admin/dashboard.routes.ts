@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { Op } from 'sequelize';
 import {
-  Order, OrderProduct, Product, User, Address, ProductImage, ProductCutType, ProductServiceType,
-  CutType, ServiceType, Setting, ContactMessage,
+  Order, OrderProduct, Product, ProductTranslation, ProductCategory, User, Address,
+  ProductImage, ProductCutType, ProductServiceType, CutType, ServiceType, Setting, ContactMessage,
 } from '../../db/models';
 import { adminOk, adminFail } from '../../utils/response';
 import { asyncHandler } from '../../utils/http';
@@ -14,7 +14,7 @@ const router = Router();
 router.get('/dashboard/stats', adminAuth, requirePermission('dashboard.view'), asyncHandler(async (_req, res) => {
   const [orders, users, products, revenueRows, pendingOrders] = await Promise.all([
     Order.count(),
-    User.count({ where: { role: 'customer' } }),
+    User.count(),
     Product.count(),
     Order.findAll({ where: { payment_status: 1 }, attributes: ['total_price'] }),
     Order.count({ where: { status: 0 } }),
@@ -61,10 +61,17 @@ router.put('/orders/:id/status', adminAuth, requirePermission('orders.manage'), 
 }));
 
 
-// Create a product with images and cut/service-type links in one call.
+// Create a product with translations, images and cut/service-type links in one call.
+// Body: { price, discount_price, ..., name_en, name_ar, description_en, description_ar,
+//         category_ids:[], images:[url], cut_type_ids:[], service_type_ids:[] }
 router.post('/products', adminAuth, requirePermission('products.manage'), asyncHandler(async (req, res) => {
-  const { images, cut_type_ids, service_type_ids, ...fields } = req.body;
+  const { name_en, name_ar, description_en, description_ar, category_ids, images, cut_type_ids, service_type_ids, ...fields } = req.body;
   const product: any = await Product.create(fields);
+  await ProductTranslation.bulkCreate([
+    { product_id: product.id, locale: 'en', name: name_en || '', description: description_en || null },
+    { product_id: product.id, locale: 'ar', name: name_ar || name_en || '', description: description_ar || null },
+  ]);
+  if (Array.isArray(category_ids)) for (const id of category_ids) await ProductCategory.create({ product_id: product.id, category_id: id });
   if (Array.isArray(images)) for (const img of images) await ProductImage.create({ product_id: product.id, image: img });
   if (Array.isArray(cut_type_ids)) for (const id of cut_type_ids) await ProductCutType.create({ product_id: product.id, cut_type_id: id });
   if (Array.isArray(service_type_ids)) for (const id of service_type_ids) await ProductServiceType.create({ product_id: product.id, service_type_id: id });
@@ -72,10 +79,21 @@ router.post('/products', adminAuth, requirePermission('products.manage'), asyncH
 }));
 
 router.put('/products/:id', adminAuth, requirePermission('products.manage'), asyncHandler(async (req, res) => {
-  const { images, cut_type_ids, service_type_ids, ...fields } = req.body;
+  const { name_en, name_ar, description_en, description_ar, category_ids, images, cut_type_ids, service_type_ids, ...fields } = req.body;
   const product: any = await Product.findByPk(req.params.id);
   if (!product) return adminFail(res, 404, 'Product not found');
   await product.update(fields);
+  if (name_en !== undefined || description_en !== undefined) {
+    await ProductTranslation.destroy({ where: { product_id: product.id } });
+    await ProductTranslation.bulkCreate([
+      { product_id: product.id, locale: 'en', name: name_en || '', description: description_en || null },
+      { product_id: product.id, locale: 'ar', name: name_ar || name_en || '', description: description_ar || null },
+    ]);
+  }
+  if (Array.isArray(category_ids)) {
+    await ProductCategory.destroy({ where: { product_id: product.id } });
+    for (const id of category_ids) await ProductCategory.create({ product_id: product.id, category_id: id });
+  }
   if (Array.isArray(images)) {
     await ProductImage.destroy({ where: { product_id: product.id } });
     for (const img of images) await ProductImage.create({ product_id: product.id, image: img });
@@ -90,6 +108,7 @@ router.put('/products/:id', adminAuth, requirePermission('products.manage'), asy
   }
   const full = await Product.findByPk(product.id, {
     include: [
+      { model: ProductTranslation, as: 'translations' },
       { model: ProductImage, as: 'images' },
       { model: ProductCutType, as: 'cut_types', include: [{ model: CutType, as: 'cut_type' }] },
       { model: ProductServiceType, as: 'service_types', include: [{ model: ServiceType, as: 'service_type' }] },
@@ -97,6 +116,7 @@ router.put('/products/:id', adminAuth, requirePermission('products.manage'), asy
   });
   adminOk(res, full);
 }));
+
 
 // Settings singleton (get + update).
 router.get('/settings', adminAuth, requirePermission('settings.view'), asyncHandler(async (_req, res) => {

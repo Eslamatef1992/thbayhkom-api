@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
-  Cart, Product, CutType, ServiceType, City, PromotionCode,
+  Cart, Product, ProductTranslation, CutType, CutTypeTranslation, ServiceType, ServiceTypeTranslation,
+  City, PromotionCode,
 } from '../db/models';
 import { ok, fail } from '../utils/response';
 import { asyncHandler } from '../utils/http';
@@ -17,16 +18,22 @@ function cartScope(req: AuthedRequest) {
 }
 
 const cartInclude = [
-  { model: Product, as: 'product' },
-  { model: CutType, as: 'cut_type' },
-  { model: ServiceType, as: 'service_type' },
+  { model: Product, as: 'product', include: [{ model: ProductTranslation, as: 'translations' }] },
+  { model: CutType, as: 'cut_type', include: [{ model: CutTypeTranslation, as: 'translations' }] },
+  { model: ServiceType, as: 'service_type', include: [{ model: ServiceTypeTranslation, as: 'translations' }] },
 ];
 
-function lineTotal(item: any): number {
-  const p = item.product;
-  const unit = p ? (p.discount_price ?? p.price ?? 0) : 0;
-  return unit * (item.quantity || 1);
+function unitPrice(p: any): number {
+  if (!p) return 0;
+  const price = Number(p.price ?? 0);
+  const discount = Number(p.discount_price ?? 0);
+  return discount > 0 ? discount : price;
 }
+
+function lineTotal(item: any): number {
+  return unitPrice(item.product) * (item.quantity || 1);
+}
+
 
 router.get('/addProductToCart/:productId', authOptional, asyncHandler(async (req: AuthedRequest, res) => {
   const scope = cartScope(req);
@@ -54,9 +61,10 @@ router.get('/addProductToCart/:productId', authOptional, asyncHandler(async (req
 }));
 
 router.get('/getMyCart', authOptional, asyncHandler(async (req: AuthedRequest, res) => {
+  const lang = req.ctx?.lang || 'en';
   const items = await Cart.findAll({ where: cartScope(req), include: cartInclude, order: [['id', 'DESC']] });
   const total = items.reduce((sum: number, it: any) => sum + lineTotal(it), 0);
-  ok(res, { MyCart: items.map(presentCartItem), total });
+  ok(res, { MyCart: items.map((it: any) => presentCartItem(it, lang)), total });
 }));
 
 router.get('/changeQuantity/:cart_id', authOptional, asyncHandler(async (req: AuthedRequest, res) => {
@@ -87,8 +95,8 @@ router.get('/checkPromo', authOptional, asyncHandler(async (req: AuthedRequest, 
 }));
 
 router.get('/calculateDeliveryCost', asyncHandler(async (req, res) => {
-  const city = await City.findByPk(req.query.city_id as string);
-  ok(res, { deliveryCost: (city as any)?.deliveryCost ?? 0 });
+  const city: any = await City.findByPk(req.query.city_id as string);
+  ok(res, { deliveryCost: city ? Number(city.delivery_cost ?? 0) : 0 });
 }));
 
 export default router;
