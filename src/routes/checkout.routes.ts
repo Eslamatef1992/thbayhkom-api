@@ -8,6 +8,7 @@ import { authRequired, authOptional, AuthedRequest } from '../middleware/auth';
 import { pageSize } from './app.routes';
 import { presentOrder, presentOrderDetails } from '../presenters/app';
 import { paymentAdapterFor } from '../services/payment';
+import { sendOrderConfirmation } from '../services/mailer';
 
 const router = Router();
 
@@ -97,6 +98,11 @@ async function buildOrder(params: {
     { notify_id: notif.id, locale: 'en', title: 'Order placed', message: `Your order #${(order as any).id} has been placed.` },
     { notify_id: notif.id, locale: 'ar', title: 'تم إنشاء الطلب', message: `تم إنشاء طلبك رقم #${(order as any).id}.` },
   ]);
+
+  // Email the customer (fire-and-forget; must never break checkout)
+  sendOrderConfirmation(order, items).catch((err) =>
+    console.warn(`Mailgun email failed for order #${(order as any).id}: ${err?.message || err}`)
+  );
 
   return { order, url: pay.requiresRedirect ? pay.url : null };
 }

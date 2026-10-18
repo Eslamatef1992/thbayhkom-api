@@ -48,6 +48,13 @@ export const config = {
     mobile: process.env.ADMIN_MOBILE || '96500000000',
   },
 
+  mail: {
+    apiKey: process.env.MAILGUN_API_KEY || '',
+    domain: process.env.MAILGUN_DOMAIN || '',
+    from: process.env.MAILGUN_FROM || '',
+    euRegion: bool(process.env.MAILGUN_EU_REGION, false),
+  },
+
   upload: {
     dir: process.env.UPLOAD_DIR || './uploads',
     maxFileSizeMb: parseInt(process.env.UPLOAD_MAX_FILE_MB || '5', 10),

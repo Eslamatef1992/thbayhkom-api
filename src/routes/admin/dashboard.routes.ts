@@ -7,6 +7,7 @@ import {
 import { adminOk, adminFail } from '../../utils/response';
 import { asyncHandler } from '../../utils/http';
 import { adminAuth, requirePermission } from '../../middleware/adminAuth';
+import { sendOrderStatusUpdate } from '../../services/mailer';
 
 const router = Router();
 
@@ -53,11 +54,17 @@ router.get('/orders/:id', adminAuth, requirePermission('orders.view'), asyncHand
 router.put('/orders/:id/status', adminAuth, requirePermission('orders.manage'), asyncHandler(async (req, res) => {
   const order: any = await Order.findByPk(req.params.id);
   if (!order) return adminFail(res, 404, 'Order not found');
+  const prevStatus = order.status;
   if (req.body.status !== undefined) order.status = parseInt(req.body.status, 10);
   if (req.body.status_name !== undefined) order.status_name = req.body.status_name;
   if (req.body.payment_status !== undefined) order.payment_status = parseInt(req.body.payment_status, 10);
   await order.save();
   adminOk(res, order);
+  if (order.status !== prevStatus) {
+    sendOrderStatusUpdate(order).catch((err) =>
+      console.warn(`Mailgun status email failed for order #${order.id}: ${err?.message || err}`)
+    );
+  }
 }));
 
 
