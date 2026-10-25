@@ -15,6 +15,7 @@ import { uploadDir } from './services/upload';
 
 export function createApp() {
   const app = express();
+app.set("trust proxy", 1);
 
   // Relax helmet's CSP so Swagger UI's inline assets load; allow cross-origin image loading.
   app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
