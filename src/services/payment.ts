@@ -21,8 +21,6 @@ class CashOnDeliveryAdapter implements PaymentAdapter {
 }
 
 class UPaymentsAdapter implements PaymentAdapter {
-  private readonly sandboxUrl = 'https://sandboxapi.upayments.com/api/v1/charge';
-  private readonly liveUrl    = 'https://api.upayments.com/api/v1/charge';
   private get isSandbox() { return process.env.UPAYMENTS_SANDBOX !== 'false'; }
   // The fallback is UPayments' public sandbox test key; live mode requires UPAYMENTS_API_KEY.
   get key() { return this.apiKey; }
@@ -39,10 +37,15 @@ class UPaymentsAdapter implements PaymentAdapter {
     return 'knet';
   }
 
-  get baseUrl() { return this.isSandbox ? 'https://sandboxapi.upayments.com/api/v1' : 'https://api.upayments.com/api/v1'; }
+  /** UPAYMENTS_API_URL overrides it (e.g. https://uapi.upayments.com/api/v1). */
+  get baseUrl() {
+    const custom = process.env.UPAYMENTS_API_URL?.trim().replace(/\/+$/, '');
+    if (custom) return custom;
+    return this.isSandbox ? 'https://sandboxapi.upayments.com/api/v1' : 'https://uapi.upayments.com/api/v1';
+  }
 
   async createPayment(order: any, method: number, lang: 'en' | 'ar'): Promise<PaymentResult> {
-    const url = this.isSandbox ? this.sandboxUrl : this.liveUrl;
+    const url = `${this.baseUrl}/charge`;
     // UPayments redirects/notifies the backend, which verifies the payment and then
     // redirects to the success/fail page the app's WebView watches for.
     const api = `${config.publicApiUrl}${config.apiBasePath}`;
@@ -91,7 +94,7 @@ class UPaymentsAdapter implements PaymentAdapter {
     } catch (err: any) {
       const body = err?.response?.data;
       console.error(`[uPayments] charge failed (${this.isSandbox ? 'sandbox' : 'LIVE'}, HTTP ${err?.response?.status ?? '-'}):`,
-        body ? JSON.stringify(body).slice(0, 2000) : err.message);
+        `${url} ->`, typeof body === 'string' ? body.replace(/\s+/g, ' ').slice(0, 300) : body ? JSON.stringify(body).slice(0, 2000) : err.message);
       return { requiresRedirect: true, paymentStatus: 0, error: gatewayMessage(body) };
     }
   }
