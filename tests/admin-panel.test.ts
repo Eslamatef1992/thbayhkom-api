@@ -154,3 +154,22 @@ describe('Arabic localization for the app', () => {
     expect(ar.body.items[0]).toMatchObject({ name_en: 'Hawalli', name_ar: 'حولي' });
   });
 });
+
+describe('Default delivery address', () => {
+  it('new address becomes default, listed first; setDefaultAddress switches it', async () => {
+    const reg = await request(app).post('/api/signUp').type('form').send({
+      name: 'Addr', email: 'addr@example.com', mobile: '965777', password: 'Secret123', confirm_password: 'Secret123',
+    });
+    const t = { Authorization: `Bearer ${reg.body.user.access_token ?? reg.body.user.accessToken ?? reg.body.user.token}` };
+    const a1 = await request(app).post('/api/addNewAdress').set(t).type('form').send({ address_name: 'Home' });
+    const a2 = await request(app).post('/api/addNewAdress').set(t).type('form').send({ address_name: 'Work' });
+    let list = await request(app).get('/api/getMyAddresses').set(t);
+    expect(list.body.items[0].address_name).toBe('Work');
+    expect(list.body.items[0].defult).toBe(1);
+    await request(app).get(`/api/setDefaultAddress/${a1.body.address_id}`).set(t);
+    list = await request(app).get('/api/getMyAddresses').set(t);
+    expect(list.body.items[0].address_name).toBe('Home');
+    expect(list.body.items.filter((a: any) => a.defult === 1)).toHaveLength(1);
+    expect(a2.body.status).toBe(true);
+  });
+});

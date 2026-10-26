@@ -42,14 +42,18 @@ router.get('/getMyAddresses', authRequired, asyncHandler(async (req: AuthedReque
   const size = await pageSize();
   const { limit, offset } = paginate(page, size);
   const { count, rows } = await Address.findAndCountAll({
-    where: { user_id: req.authUser.id }, include: addressInclude, limit, offset, order: [['id', 'DESC']],
+    where: { user_id: req.authUser.id }, include: addressInclude, limit, offset,
+    // Default first, then newest.
+    order: [['defult', 'DESC'], ['id', 'DESC']],
   });
   ok(res, { items: rows.map(presentAddress), is_more: offset + rows.length < count });
 }));
 
 router.post('/addNewAdress', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
-  await Address.create({ ...addressBody(req), user_id: req.authUser.id });
-  ok(res, {}, 'Address added');
+  // A newly added address becomes the default (pre-selected at checkout).
+  await Address.update({ defult: 0 }, { where: { user_id: req.authUser.id } });
+  const address: any = await Address.create({ ...addressBody(req), user_id: req.authUser.id, defult: 1 });
+  ok(res, { address_id: address.id }, 'Address added');
 }));
 
 router.post('/updateAdress/:address_id', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
@@ -57,6 +61,14 @@ router.post('/updateAdress/:address_id', authRequired, asyncHandler(async (req: 
   if (!address) return ok(res, {}, 'Address not found');
   await address.update(addressBody(req));
   ok(res, {}, 'Address updated');
+}));
+
+router.get('/setDefaultAddress/:id', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
+  const address = await Address.findOne({ where: { id: req.params.id, user_id: req.authUser.id } });
+  if (!address) return ok(res, {}, 'Address not found');
+  await Address.update({ defult: 0 }, { where: { user_id: req.authUser.id } });
+  await address.update({ defult: 1 });
+  ok(res, {}, 'Default address updated');
 }));
 
 router.get('/deleteAddress/:id', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
