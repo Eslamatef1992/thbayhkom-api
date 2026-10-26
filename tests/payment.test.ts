@@ -42,6 +42,7 @@ describe('UPayments flow', () => {
     const body = axios.post.mock.calls.at(-1)[1];
     expect(body.returnUrl).toBe(`https://back.thabayehkom.app/api/payment/return?oid=${res.body.order.id}&lang=en`);
     expect(body.notificationUrl).toContain('/api/payment/webhook?oid=');
+    expect(body.reference).toEqual({ id: `order-${res.body.order.id}` });
   });
 
   it('webhook marks the order paid only after UPayments confirms CAPTURED', async () => {

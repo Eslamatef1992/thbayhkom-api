@@ -56,6 +56,8 @@ class UPaymentsAdapter implements PaymentAdapter {
           currency:    'KWD',
           amount:      Number(order.total_price),
         },
+        // Required by UPayments (top-level, in addition to order.reference).
+        reference: { id: `order-${order.id}` },
         language:   lang,
         returnUrl:  `${api}/payment/return?${qs}`,
         cancelUrl:  `${api}/payment/cancel?${qs}`,
