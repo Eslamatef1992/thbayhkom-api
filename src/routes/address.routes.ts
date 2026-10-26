@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Address, Country, CountryTranslation, City, CityTranslation } from '../db/models';
+import { Address, Country, City } from '../db/models';
 import { ok } from '../utils/response';
 import { asyncHandler, getPage, paginate } from '../utils/http';
 import { authRequired, AuthedRequest } from '../middleware/auth';
@@ -9,9 +9,9 @@ import { presentAddress } from '../presenters/app';
 const router = Router();
 
 const addressInclude = [
-  { model: Country, as: 'country', include: [{ model: CountryTranslation, as: 'translations' }] },
-  { model: City, as: 'city', include: [{ model: CityTranslation, as: 'translations' }] },
-  { model: City, as: 'governorate', include: [{ model: CityTranslation, as: 'translations' }] },
+  { model: Country, as: 'country' },
+  { model: City, as: 'city' },
+  { model: City, as: 'governorate' },
 ];
 
 function addressBody(req: any) {
@@ -38,16 +38,14 @@ function addressBody(req: any) {
 }
 
 router.get('/getMyAddresses', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
-  const lang = req.ctx?.lang || 'en';
   const page = getPage(req);
   const size = await pageSize();
   const { limit, offset } = paginate(page, size);
   const { count, rows } = await Address.findAndCountAll({
     where: { user_id: req.authUser.id }, include: addressInclude, limit, offset, order: [['id', 'DESC']],
   });
-  ok(res, { items: rows.map((a: any) => presentAddress(a, lang)), is_more: offset + rows.length < count });
+  ok(res, { items: rows.map(presentAddress), is_more: offset + rows.length < count });
 }));
-
 
 router.post('/addNewAdress', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
   await Address.create({ ...addressBody(req), user_id: req.authUser.id });

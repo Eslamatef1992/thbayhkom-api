@@ -1,3 +1,0 @@
-Thabayehkom API listening on http://localhost:3999/api
-[0mGET /swagger.json [32m200[0m 2.048 ms - 46957[0m
-[0mGET /swagger/ [32m200[0m 1.599 ms - 3116[0m

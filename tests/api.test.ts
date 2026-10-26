@@ -97,10 +97,9 @@ describe('Admin dashboard', () => {
   it('admin can create a category via CRUD', async () => {
     const res = await request(app).post('/api/admin/categories')
       .set('Authorization', `Bearer ${token}`)
-      .send({ status: 'active', image: 'categories/seafood.png' });
+      .send({ name: 'Seafood', status: 'active' });
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data.id).toBeTruthy();
+    expect(res.body.data.name).toBe('Seafood');
   });
 
   it('non-admin token is forbidden on admin routes', async () => {

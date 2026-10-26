@@ -1,6 +1,7 @@
+import { sendOrderConfirmation, sendInBackground } from '../services/email.service';
 import { Router } from 'express';
 import {
-  Cart, Product, ProductTranslation, Order, OrderProduct, Address, PromotionCode, City, Notification, NotificationTranslation,
+  Cart, Product, Order, OrderProduct, Address, PromotionCode, City, Notification,
 } from '../db/models';
 import { ok, fail } from '../utils/response';
 import { asyncHandler, getPage, paginate } from '../utils/http';
@@ -8,29 +9,25 @@ import { authRequired, authOptional, AuthedRequest } from '../middleware/auth';
 import { pageSize } from './app.routes';
 import { presentOrder, presentOrderDetails } from '../presenters/app';
 import { paymentAdapterFor } from '../services/payment';
-import { sendOrderConfirmation } from '../services/mailer';
+import { findValidPromo, promoDiscount } from '../services/promo';
 
 const router = Router();
 
 function unitPrice(p: any): number {
-  if (!p) return 0;
-  const price = Number(p.price ?? 0);
-  const discount = Number(p.discount_price ?? 0);
-  return discount > 0 ? discount : price;
+  return p ? (p.discount_price ?? p.price ?? 0) : 0;
 }
 
 async function applyPromo(codeName: string | undefined, subTotal: number): Promise<{ discount: number; code?: string }> {
   if (!codeName) return { discount: 0 };
-  const promo: any = await PromotionCode.findOne({ where: { code: codeName, status: 'active' } });
+  const promo = await findValidPromo(codeName);
   if (!promo) return { discount: 0 };
-  const discount = promo.type === 2 ? (subTotal * (promo.percent || 0)) / 100 : promo.percent || 0;
-  return { discount, code: promo.code };
+  return { discount: promoDiscount(promo, subTotal), code: promo.code };
 }
 
 async function deliveryFor(cityId?: number): Promise<number> {
   if (!cityId) return 0;
   const city: any = await City.findByPk(cityId);
-  return city ? Number(city.delivery_cost ?? 0) : 0;
+  return city?.deliveryCost ?? 0;
 }
 
 async function guestAddress(b: any) {
@@ -90,19 +87,13 @@ async function buildOrder(params: {
   if (pay.paymentId) (order as any).payment_id = pay.paymentId;
   await order.save();
 
-  // Record a notification (title/message live in the translation table).
-  const notif: any = await Notification.create({
-    user_id: req.authUser?.id || null, order_id: (order as any).id, messag_type: 'order', status: 'unread',
+  await Notification.create({
+    user_id: req.authUser?.id || null, order_id: (order as any).id, messag_type: 'order',
+    title: 'Order placed', message: `Your order #${(order as any).id} has been placed.`, status: 'unread',
   });
-  await NotificationTranslation.bulkCreate([
-    { notify_id: notif.id, locale: 'en', title: 'Order placed', message: `Your order #${(order as any).id} has been placed.` },
-    { notify_id: notif.id, locale: 'ar', title: 'تم إنشاء الطلب', message: `تم إنشاء طلبك رقم #${(order as any).id}.` },
-  ]);
 
-  // Email the customer (fire-and-forget; must never break checkout)
-  sendOrderConfirmation(order, items).catch((err) =>
-    console.warn(`Mailgun email failed for order #${(order as any).id}: ${err?.message || err}`)
-  );
+  // Covers both cart checkout and buy-now.
+  sendInBackground(`order #${(order as any).id} confirmation`, sendOrderConfirmation((order as any).id));
 
   return { order, url: pay.requiresRedirect ? pay.url : null };
 }
@@ -190,16 +181,15 @@ router.get('/getMyOrders', authRequired, asyncHandler(async (req: AuthedRequest,
 }));
 
 router.get('/getOrderById/:id', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
-  const lang = req.ctx?.lang || 'en';
   const order = await Order.findOne({
     where: { id: req.params.id, user_id: req.authUser.id },
     include: [
-      { model: OrderProduct, as: 'products', include: [{ model: Product, as: 'product', include: [{ model: ProductTranslation, as: 'translations' }] }] },
+      { model: OrderProduct, as: 'products', include: [{ model: Product, as: 'product' }] },
       { model: Address, as: 'address' },
     ],
   });
   if (!order) return fail(res, 404, 'Order not found');
-  ok(res, { item: presentOrderDetails(order, lang) });
+  ok(res, { item: presentOrderDetails(order) });
 }));
 
 export default router;

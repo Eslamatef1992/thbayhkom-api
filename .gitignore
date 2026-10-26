@@ -6,3 +6,5 @@ uploads/
 .env
 coverage/
 
+uploads-test/
+logs/*.log

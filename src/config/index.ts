@@ -9,6 +9,8 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
   apiBasePath: process.env.API_BASE_PATH || '/api',
+  /** Public origin of this API, used in payment callback URLs. */
+  publicApiUrl: (process.env.PUBLIC_API_URL || 'https://back.thabayehkom.app').replace(/\/$/, ''),
 
   db: {
     dialect: (process.env.DB_DIALECT || 'sqlite') as 'sqlite' | 'postgres',
@@ -48,16 +50,10 @@ export const config = {
     mobile: process.env.ADMIN_MOBILE || '96500000000',
   },
 
-  mail: {
-    apiKey: process.env.MAILGUN_API_KEY || '',
-    domain: process.env.MAILGUN_DOMAIN || '',
-    from: process.env.MAILGUN_FROM || '',
-    euRegion: bool(process.env.MAILGUN_EU_REGION, false),
-  },
-
   upload: {
     dir: process.env.UPLOAD_DIR || './uploads',
     maxFileSizeMb: parseInt(process.env.UPLOAD_MAX_FILE_MB || '5', 10),
+    maxVideoSizeMb: parseInt(process.env.UPLOAD_MAX_VIDEO_MB || '100', 10),
     // Public base URL used to build returned file URLs. Falls back to request host at runtime.
     publicBaseUrl: process.env.UPLOAD_PUBLIC_BASE_URL || '',
   },

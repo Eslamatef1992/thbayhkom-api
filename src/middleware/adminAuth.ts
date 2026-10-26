@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
-import { Admin, Role, RoleTranslation, Permission, RolePermission } from '../db/models';
+import { User, Role, Permission } from '../db/models';
 import { adminFail } from '../utils/response';
 
 export interface AdminRequest extends Request {
@@ -9,32 +9,32 @@ export interface AdminRequest extends Request {
   adminPermissions?: string[];
 }
 
-/** Resolve permission keys for an admin. Role id 1 (super admin) → all ('*'). */
-export async function permissionsForAdmin(admin: any): Promise<string[]> {
+async function permissionsFor(user: any): Promise<string[]> {
+  // Super admin (role column) shortcut → all permissions.
+  const roles: any[] = await (user as any).getRoles({ include: [Permission] });
   const perms = new Set<string>();
-  if (!admin.role_id || admin.role_id === 1) {
-    perms.add('*'); // super admin / no explicit role → full access
-    return [...perms];
+  for (const r of roles) {
+    if (r.name === 'admin') perms.add('*');
+    for (const p of (r as any).permissions || []) perms.add(p.name);
   }
-  const links = await RolePermission.findAll({ where: { role_id: admin.role_id } });
-  const ids = links.map((l: any) => l.permission_id);
-  const found = await Permission.findAll({ where: { id: ids } });
-  for (const p of found) perms.add((p as any).key);
+  if ((user as any).role === 'admin' || (user as any).is_admin) perms.add('*');
   return [...perms];
 }
 
-/** JWT payload for admins carries { sub, kind: 'admin' } to separate them from app users. */
+/** Verifies a JWT and ensures the user is an admin/manager. */
 export async function adminAuth(req: AdminRequest, res: Response, next: NextFunction): Promise<void> {
   const h = req.header('Authorization') || '';
   const token = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
   if (!token) return adminFail(res, 401, 'Unauthenticated');
   try {
     const decoded = jwt.verify(token, config.jwt.secret) as any;
-    if (decoded.kind !== 'admin') return adminFail(res, 403, 'Not an admin token');
-    const admin = await Admin.findByPk(decoded.sub);
-    if (!admin || (admin as any).status !== 'active') return adminFail(res, 401, 'Unauthenticated');
-    req.admin = admin;
-    req.adminPermissions = await permissionsForAdmin(admin);
+    const user = await User.findByPk(decoded.sub);
+    if (!user) return adminFail(res, 401, 'Unauthenticated');
+    if (!((user as any).is_admin || (user as any).role === 'admin' || (user as any).role === 'manager')) {
+      return adminFail(res, 403, 'Forbidden: admin access required');
+    }
+    req.admin = user;
+    req.adminPermissions = await permissionsFor(user);
     next();
   } catch {
     return adminFail(res, 401, 'Invalid token');
@@ -49,4 +49,3 @@ export function requirePermission(permission: string) {
     return adminFail(res, 403, `Forbidden: missing permission '${permission}'`);
   };
 }
-

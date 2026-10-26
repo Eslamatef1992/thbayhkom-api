@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Notification, NotificationTranslation, Order } from '../db/models';
+import { Notification, Order } from '../db/models';
 import { ok } from '../utils/response';
 import { asyncHandler, getPage, paginate } from '../utils/http';
 import { authRequired, AuthedRequest } from '../middleware/auth';
@@ -10,15 +10,13 @@ import { config } from '../config';
 const router = Router();
 
 router.get('/myNotifications', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
-  const lang = req.ctx?.lang || 'en';
   const page = getPage(req);
   const size = await pageSize();
   const { limit, offset } = paginate(page, size);
   const { count, rows } = await Notification.findAndCountAll({
     where: { user_id: req.authUser.id }, order: [['id', 'DESC']], limit, offset,
-    include: [{ model: NotificationTranslation, as: 'translations' }],
   });
-  ok(res, { items: rows.map((n: any) => presentNotification(n, lang)), is_more: offset + rows.length < count });
+  ok(res, { items: rows.map(presentNotification), is_more: offset + rows.length < count });
 }));
 
 /**
