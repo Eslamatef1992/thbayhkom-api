@@ -124,3 +124,44 @@ export function presentUser(u: any, accessToken?: string) {
     access_token: accessToken ?? undefined,
   };
 }
+
+/** Package for the app. price_after is what the customer pays; price_before is shown struck through. */
+export function presentPackage(pkg: any) {
+  const before = pkg.price_before != null ? Number(pkg.price_before) : null;
+  const after = Number(pkg.price_after ?? 0);
+  return {
+    id: pkg.id,
+    name: localized(pkg, 'name'),
+    name_en: pkg.name,
+    name_ar: pkg.name_ar ?? null,
+    description: localized(pkg, 'description'),
+    image: pkg.image,
+    price_before: before,
+    price_after: after,
+    discount_percent: before && before > after ? Math.round(((before - after) / before) * 100) : 0,
+    status: pkg.status,
+    created_at: pkg.created_at ?? pkg.createdAt,
+    products: (pkg.items || []).map((it: any) => ({
+      id: it.id,
+      product_id: it.product_id,
+      quantity: it.quantity,
+      product: it.product ? presentProduct(it.product) : null,
+    })),
+  };
+}
+
+/**
+ * Product-shaped view of a package, so cart/checkout screens that render `product`
+ * can show a package line unchanged (price = before, discount_price = after).
+ */
+export function packageAsProduct(pkg: any) {
+  return {
+    ...presentProduct({
+      id: pkg.id, image: pkg.image, name: pkg.name, name_ar: pkg.name_ar,
+      description: pkg.description, description_ar: pkg.description_ar,
+      price: pkg.price_before ?? pkg.price_after, discount_price: pkg.price_before != null ? pkg.price_after : null,
+      quantity: 9999, status: pkg.status,
+    }),
+    is_package: true,
+  };
+}

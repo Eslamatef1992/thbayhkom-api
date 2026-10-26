@@ -46,6 +46,8 @@ const PERMISSIONS: Array<[string, string]> = [
   ['settings.view', 'View settings'],
   ['settings.manage', 'Manage settings'],
   ['contact.view', 'View contact messages'],
+  ['packages.view', 'View packages'],
+  ['packages.manage', 'Manage packages'],
 ];
 
 // Manager gets everything except settings + customer management.

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { Op } from 'sequelize';
 import {
   Order, OrderProduct, Product, User, Address, ProductImage, ProductCutType, ProductServiceType,
-  CutType, ServiceType, Setting, ContactMessage,
+  CutType, ServiceType, Setting, ContactMessage, Package,
 } from '../../db/models';
 import { adminOk, adminFail } from '../../utils/response';
 import { sendOrderStatusUpdate, sendInBackground } from '../../services/email.service';
@@ -47,7 +47,7 @@ router.get('/orders', adminAuth, requirePermission('orders.view'), asyncHandler(
 router.get('/orders/:id', adminAuth, requirePermission('orders.view'), asyncHandler(async (req, res) => {
   const order = await Order.findByPk(req.params.id, {
     include: [
-      { model: OrderProduct, as: 'products', include: [{ model: Product, as: 'product' }] },
+      { model: OrderProduct, as: 'products', include: [{ model: Product, as: 'product' }, { model: Package, as: 'package' }] },
       { model: Address, as: 'address' },
     ],
   });

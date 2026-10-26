@@ -1,7 +1,7 @@
 import { sendOrderConfirmation, sendInBackground } from '../services/email.service';
 import { Router } from 'express';
 import {
-  Cart, Product, Order, OrderProduct, Address, PromotionCode, City, Notification,
+  Cart, Product, Order, OrderProduct, Address, PromotionCode, City, Notification, Package,
 } from '../db/models';
 import { ok, fail } from '../utils/response';
 import { asyncHandler, getPage, paginate } from '../utils/http';
@@ -42,7 +42,11 @@ async function guestAddress(b: any) {
   return (address as any).id;
 }
 
-interface LineItem { product: any; quantity: number; cut_type_id?: number; service_type_id?: number; special_request?: string; }
+/** A product line, or a package line (`packageId` set; `product` then holds its prices). */
+interface LineItem { product: any; packageId?: number; quantity: number; cut_type_id?: number; service_type_id?: number; special_request?: string; }
+
+/** Pricing view of a package: customers pay price_after (price_before kept for reference). */
+const packagePricing = (pkg: any) => ({ id: null, price: pkg.price_before ?? pkg.price_after, discount_price: pkg.price_after });
 
 async function buildOrder(params: {
   req: AuthedRequest;
@@ -75,7 +79,7 @@ async function buildOrder(params: {
 
   for (const it of items) {
     await OrderProduct.create({
-      order_id: (order as any).id, product_id: it.product.id,
+      order_id: (order as any).id, product_id: it.packageId ? null : it.product.id, package_id: it.packageId ?? null,
       cut_type_id: it.cut_type_id || null, service_type_id: it.service_type_id || null,
       special_request: it.special_request || null, quantity: it.quantity,
       price: it.product.price, offer_price: it.product.discount_price ?? null, discount: 0,
@@ -92,8 +96,11 @@ async function buildOrder(params: {
     title: 'Order placed', message: `Your order #${(order as any).id} has been placed.`, status: 'unread',
   });
 
-  // Covers both cart checkout and buy-now.
-  sendInBackground(`order #${(order as any).id} confirmation`, sendOrderConfirmation((order as any).id));
+  // Cash on delivery: confirm now. KNET/card: the confirmation is sent once the payment
+  // is verified (routes/payment.routes.ts), so customers never get it for an unpaid order.
+  if (!pay.requiresRedirect) {
+    sendInBackground(`order #${(order as any).id} confirmation`, sendOrderConfirmation((order as any).id));
+  }
 
   return { order, url: pay.requiresRedirect ? pay.url : null };
 }
@@ -102,8 +109,10 @@ async function buildOrder(params: {
 router.post('/checkOut', authOptional, asyncHandler(async (req: AuthedRequest, res) => {
   const paymentType = parseInt(req.body.payment_type, 10) || 3;
   const scope = req.authUser?.id ? { user_id: req.authUser.id } : { fcm_token: req.ctx?.fcmToken || 'anonymous' };
-  const cartItems = await Cart.findAll({ where: scope, include: [{ model: Product, as: 'product' }] });
-  if (!cartItems.length) return fail(res, 422, 'Your cart is empty');
+  const cartItems = await Cart.findAll({ where: scope, include: [{ model: Product, as: 'product' }, { model: Package, as: 'package' }] });
+  // Skip lines whose product/package was deleted since it was added.
+  const validItems = cartItems.filter((c: any) => c.product || c.package);
+  if (!validItems.length) return fail(res, 422, 'Your cart is empty');
 
   let addressId: number | undefined;
   let guestContact;
@@ -120,8 +129,10 @@ router.post('/checkOut', authOptional, asyncHandler(async (req: AuthedRequest, r
     guestContact = { name: req.body.full_name, email: req.body.email, mobile: req.body.mobile };
   }
 
-  const items: LineItem[] = cartItems.map((c: any) => ({
-    product: c.product, quantity: c.quantity, cut_type_id: c.cut_type_id,
+  const items: LineItem[] = validItems.map((c: any) => ({
+    product: c.package ? packagePricing(c.package) : c.product,
+    packageId: c.package ? c.package.id : undefined,
+    quantity: c.quantity, cut_type_id: c.cut_type_id,
     service_type_id: c.service_type_id, special_request: c.special_request,
   }));
 
@@ -184,7 +195,7 @@ router.get('/getOrderById/:id', authRequired, asyncHandler(async (req: AuthedReq
   const order = await Order.findOne({
     where: { id: req.params.id, user_id: req.authUser.id },
     include: [
-      { model: OrderProduct, as: 'products', include: [{ model: Product, as: 'product' }] },
+      { model: OrderProduct, as: 'products', include: [{ model: Product, as: 'product' }, { model: Package, as: 'package' }] },
       { model: Address, as: 'address' },
     ],
   });

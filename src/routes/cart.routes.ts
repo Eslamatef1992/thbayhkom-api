@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  Cart, Product, CutType, ServiceType, City, PromotionCode,
+  Cart, Product, CutType, ServiceType, City, PromotionCode, Package,
 } from '../db/models';
 import { ok, fail } from '../utils/response';
 import { asyncHandler } from '../utils/http';
@@ -21,11 +21,12 @@ const cartInclude = [
   { model: Product, as: 'product' },
   { model: CutType, as: 'cut_type' },
   { model: ServiceType, as: 'service_type' },
+  { model: Package, as: 'package' },
 ];
 
 function lineTotal(item: any): number {
   const p = item.product;
-  const unit = p ? (p.discount_price ?? p.price ?? 0) : 0;
+  const unit = p ? (p.discount_price ?? p.price ?? 0) : item.package ? Number(item.package.price_after ?? 0) : 0;
   return unit * (item.quantity || 1);
 }
 

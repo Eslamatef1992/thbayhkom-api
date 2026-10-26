@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import authRoutes from './auth.routes';
 import dashboardRoutes from './dashboard.routes';
 import extraRoutes from './extra.routes';
+import packageRoutes from './packages.routes';
 import { crudRouter } from './crud';
 import {
   Category, Product, Banner, Advertisement, Country, City, CutType, ServiceType,
@@ -14,7 +15,8 @@ const router = Router();
 // Auth + dashboard + custom endpoints
 router.use('/auth', authRoutes);
 router.use('/', dashboardRoutes);
-router.use('/', extraRoutes); // roles alias, admin users, product detail, order status alias
+router.use('/', extraRoutes);
+router.use('/packages', packageRoutes); // roles alias, admin users, product detail, order status alias
 
 // Generic CRUD resources for the dashboard. Each is permission-guarded.
 router.use('/categories', crudRouter(Category, 'categories', { searchFields: ['name'] }));

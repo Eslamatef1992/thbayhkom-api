@@ -4,6 +4,7 @@ import { Order } from '../db/models';
 import { asyncHandler } from '../utils/http';
 import { config } from '../config';
 import { verifyUPayment } from '../services/payment';
+import { sendOrderConfirmation, sendInBackground } from '../services/email.service';
 
 /**
  * UPayments callbacks. Nothing here trusts the incoming parameters: the payment
@@ -65,6 +66,10 @@ async function settle(params: any): Promise<{ orderId?: number; status: number }
   }
   order.payment_check_response = JSON.stringify(v.raw ?? null).slice(0, 20000);
   await order.save();
+  // Paid just now (we returned early above if it was already paid): send the confirmation.
+  if (order.payment_status === PAID) {
+    sendInBackground(`order #${order.id} confirmation`, sendOrderConfirmation(order.id));
+  }
   return { orderId: order.id, status: order.payment_status };
 }
 

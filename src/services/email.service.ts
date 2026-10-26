@@ -1,6 +1,6 @@
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
-import { Order, OrderProduct, Product } from '../db/models';
+import { Order, OrderProduct, Product, Package } from '../db/models';
 
 /**
  * Transactional email via Mailgun (bilingual EN/AR).
@@ -114,7 +114,7 @@ export const sendEmailConfirmation = (to: string, name: string) => sendWelcomeEm
 
 async function loadOrder(orderId: number): Promise<any | null> {
   return Order.findByPk(orderId, {
-    include: [{ model: OrderProduct, as: 'products', include: [{ model: Product, as: 'product' }] }],
+    include: [{ model: OrderProduct, as: 'products', include: [{ model: Product, as: 'product' }, { model: Package, as: 'package' }] }],
   });
 }
 
@@ -124,7 +124,7 @@ export async function sendOrderConfirmation(orderOrId: number | { id: number }):
 
   const items: any[] = order.products || [];
   const itemRows = items.map((it) => {
-    const p = it.product || {};
+    const p = it.product || (it.package ? { name: `📦 ${it.package.name}`, name_ar: it.package.name_ar } : {});
     const unit = it.offer_price ?? it.price;
     const name = [p.name || p.name_en, p.name_ar].filter(Boolean).map(esc).join(' / ') || `#${it.product_id}`;
     return `<tr>

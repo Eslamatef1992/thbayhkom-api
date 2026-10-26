@@ -257,6 +257,7 @@ Cart.init(
     service_type_id: { type: DataTypes.INTEGER, allowNull: true },
     country_id: { type: DataTypes.INTEGER, allowNull: true },
     special_request: { type: DataTypes.STRING, allowNull: true },
+    package_id: { type: DataTypes.INTEGER, allowNull: true }, // set instead of product_id for a package line
   },
   { sequelize, modelName: 'cart', tableName: 'carts' }
 );
@@ -321,6 +322,7 @@ OrderProduct.init(
     discount: { type: DataTypes.FLOAT, defaultValue: 0 },
     price: { type: DataTypes.FLOAT, defaultValue: 0 },
     offer_price: { type: DataTypes.FLOAT, allowNull: true },
+    package_id: { type: DataTypes.INTEGER, allowNull: true }, // set instead of product_id for a package line
   },
   { sequelize, modelName: 'order_product', tableName: 'order_products' }
 );
@@ -447,6 +449,35 @@ Setting.init(
   { sequelize, modelName: 'setting', tableName: 'settings' }
 );
 
+/** A bundle of products sold together at a package price (admin "Packages" module). */
+export class Package extends Model {}
+Package.init(
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    name: { type: DataTypes.STRING },
+    name_ar: { type: DataTypes.STRING, allowNull: true },
+    description: { type: DataTypes.TEXT, allowNull: true },
+    description_ar: { type: DataTypes.TEXT, allowNull: true },
+    image: { type: DataTypes.STRING, allowNull: true },
+    price_before: { type: DataTypes.FLOAT, allowNull: true }, // shown struck through
+    price_after: { type: DataTypes.FLOAT, defaultValue: 0 },  // what the customer pays
+    status: { type: DataTypes.STRING, defaultValue: 'active' },
+    sort_order: { type: DataTypes.INTEGER, defaultValue: 0 },
+  },
+  { sequelize, modelName: 'package', tableName: 'packages' }
+);
+
+export class PackageProduct extends Model {}
+PackageProduct.init(
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    package_id: { type: DataTypes.INTEGER },
+    product_id: { type: DataTypes.INTEGER },
+    quantity: { type: DataTypes.INTEGER, defaultValue: 1 },
+  },
+  { sequelize, modelName: 'package_product', tableName: 'package_products' }
+);
+
 /* ------------------------------------------------------------------ */
 /* Associations                                                        */
 /* ------------------------------------------------------------------ */
@@ -481,3 +512,8 @@ Permission.belongsToMany(Role, { through: RolePermission, foreignKey: 'permissio
 User.belongsToMany(Role, { through: UserRole, foreignKey: 'user_id', otherKey: 'role_id' });
 Role.belongsToMany(User, { through: UserRole, foreignKey: 'role_id', otherKey: 'user_id' });
 
+Package.hasMany(PackageProduct, { as: 'items', foreignKey: 'package_id' });
+PackageProduct.belongsTo(Package, { foreignKey: 'package_id' });
+PackageProduct.belongsTo(Product, { as: 'product', foreignKey: 'product_id' });
+Cart.belongsTo(Package, { as: 'package', foreignKey: 'package_id' });
+OrderProduct.belongsTo(Package, { as: 'package', foreignKey: 'package_id' });

@@ -1,4 +1,4 @@
-import { presentProduct } from './catalog';
+import { presentProduct, presentPackage, packageAsProduct } from './catalog';
 
 export function presentSetting(s: any, pages: any[], cutTypes: any[], serviceTypes: any[]) {
   if (!s) return null;
@@ -120,7 +120,9 @@ export function presentCartItem(c: any) {
     country_id: c.country_id,
     special_request: c.special_request,
     created_at: c.created_at,
-    product: c.product ? presentProduct(c.product) : null,
+    product: c.product ? presentProduct(c.product) : c.package ? packageAsProduct(c.package) : null,
+    package_id: c.package_id ?? null,
+    package: c.package ? presentPackage(c.package) : null,
     cut_type: typeShape(c.cut_type),
     service_type: typeShape(c.service_type),
   };
@@ -170,7 +172,9 @@ export function presentOrderDetails(o: any) {
       price: op.price,
       offer_price: op.offer_price,
       created_at: op.created_at,
-      product: op.product ? presentProduct(op.product) : null,
+      product: op.product ? presentProduct(op.product) : op.package ? packageAsProduct(op.package) : null,
+      package_id: op.package_id ?? null,
+      package: op.package ? presentPackage(op.package) : null,
       service_type: typeShape(op.service_type),
       cut_type: typeShape(op.cut_type),
     })),
