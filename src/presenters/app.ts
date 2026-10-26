@@ -40,8 +40,8 @@ export function presentSetting(s: any, pages: any[], cutTypes: any[], serviceTyp
     is_alowed_buying: s.is_alowed_buying,
     is_alowed_cart: s.is_alowed_cart,
     account_need_to_activate: s.account_need_to_activate,
-    created_at: s.created_at,
-    updated_at: s.updated_at,
+    created_at: s.created_at ?? s.createdAt,
+    updated_at: s.updated_at ?? s.updatedAt,
     title: s.title,
     description: s.description,
     address: s.address,
@@ -50,13 +50,13 @@ export function presentSetting(s: any, pages: any[], cutTypes: any[], serviceTyp
       slug: p.slug,
       image: p.image,
       views: p.views,
-      created_at: p.created_at,
+      created_at: p.created_at ?? p.createdAt,
       title: p.title,
       description: p.description,
       key_words: p.key_words,
     })),
-    cutTypes: (cutTypes || []).map((t: any) => ({ id: t.id, status: t.status, created_at: t.created_at, name: t.name })),
-    serviceTypes: (serviceTypes || []).map((t: any) => ({ id: t.id, status: t.status, created_at: t.created_at, name: t.name })),
+    cutTypes: (cutTypes || []).map((t: any) => ({ id: t.id, status: t.status, created_at: t.created_at ?? t.createdAt, name: t.name })),
+    serviceTypes: (serviceTypes || []).map((t: any) => ({ id: t.id, status: t.status, created_at: t.created_at ?? t.createdAt, name: t.name })),
   };
 }
 
@@ -69,7 +69,7 @@ export function presentAdvertisement(a: any) {
     status: a.status,
     image: a.image,
     link: a.link,
-    created_at: a.created_at,
+    created_at: a.created_at ?? a.createdAt,
     category_name: a.category_name,
   };
 }
@@ -99,13 +99,13 @@ export function presentAddress(a: any) {
     defult: a.defult,
     longitude: a.longitude,
     latitude: a.latitude,
-    created_at: a.created_at,
+    created_at: a.created_at ?? a.createdAt,
   };
 }
 
 
 function typeShape(t: any) {
-  return t ? { id: t.id, status: t.status, created_at: t.created_at, name: t.name } : null;
+  return t ? { id: t.id, status: t.status, created_at: t.created_at ?? t.createdAt, name: t.name } : null;
 }
 
 export function presentCartItem(c: any) {
@@ -119,7 +119,7 @@ export function presentCartItem(c: any) {
     service_type_id: c.service_type_id,
     country_id: c.country_id,
     special_request: c.special_request,
-    created_at: c.created_at,
+    created_at: c.created_at ?? c.createdAt,
     product: c.product ? presentProduct(c.product) : c.package ? packageAsProduct(c.package) : null,
     package_id: c.package_id ?? null,
     package: c.package ? presentPackage(c.package) : null,
@@ -152,7 +152,7 @@ export function presentOrder(o: any) {
     status: o.status,
     ordered_date: o.ordered_date,
     special_request: o.special_request,
-    created_at: o.created_at,
+    created_at: o.created_at ?? o.createdAt,
     status_name: o.status_name,
   };
 }
@@ -171,7 +171,7 @@ export function presentOrderDetails(o: any) {
       discount: op.discount,
       price: op.price,
       offer_price: op.offer_price,
-      created_at: op.created_at,
+      created_at: op.created_at ?? op.createdAt,
       product: op.product ? presentProduct(op.product) : op.package ? packageAsProduct(op.package) : null,
       package_id: op.package_id ?? null,
       package: op.package ? presentPackage(op.package) : null,
@@ -192,7 +192,7 @@ export function presentPromotionCode(p: any) {
     start_date: p.start_date,
     end_date: p.end_date,
     description: p.description,
-    created_at: p.created_at,
+    created_at: p.created_at ?? p.createdAt,
   };
 }
 
@@ -203,7 +203,7 @@ export function presentNotification(n: any) {
     order_id: n.order_id,
     messag_type: n.messag_type,
     status: n.status,
-    created_at: n.created_at,
+    created_at: n.created_at ?? n.createdAt,
     message: n.message,
     title: n.title,
   };

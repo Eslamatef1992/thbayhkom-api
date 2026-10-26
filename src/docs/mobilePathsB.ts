@@ -34,7 +34,6 @@ export function mobilePathsB(): Record<string, any> {
   paths['/getMyOrders'] = { get: { tags: ['Orders'], summary: 'List my orders (paginated)', security: [{ bearerAuth: [] }], parameters: [queryPage(), queryFcm()], responses: ok200(mobileExamples.getMyOrders) } };
   paths['/getOrderById/{id}'] = { get: { tags: ['Orders'], summary: 'Order details', security: [{ bearerAuth: [] }], parameters: [pathId(), queryFcm()], responses: ok200(mobileExamples.getOrderById) } };
   paths['/myNotifications'] = { get: { tags: ['Notifications'], summary: 'List notifications (paginated)', security: [{ bearerAuth: [] }], parameters: [queryPage(), queryFcm()], responses: ok200(mobileExamples.myNotifications) } };
-  paths['/payment/callback'] = { get: { tags: ['Checkout'], summary: 'Payment gateway return/callback → redirects WebView', parameters: [{ name: 'order_id', in: 'query', schema: S }, { name: 'status', in: 'query', schema: S }, { name: 'transaction_id', in: 'query', schema: S }, { name: 'lang', in: 'query', schema: S }], responses: { '302': { description: 'Redirect to success/fail URL' } } } };
 
   // Uploads (auth required: any customer or admin)
   paths['/upload/single'] = {

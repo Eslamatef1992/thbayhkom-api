@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Op } from 'sequelize';
-import { Order } from '../db/models';
+import { Cart, Order } from '../db/models';
+import { notifyOrderPlaced } from './checkout.routes';
 import { asyncHandler } from '../utils/http';
 import { config } from '../config';
 import { verifyUPayment } from '../services/payment';
@@ -68,14 +69,25 @@ async function settle(params: any): Promise<{ orderId?: number; status: number }
     order.payment_id = trackId;
   } else if (v.final) {
     order.payment_status = FAILED;
+    order.status_name = 'Payment failed';
   }
   order.payment_check_response = JSON.stringify(v.raw ?? null).slice(0, 20000);
   await order.save();
   // Paid just now (we returned early above if it was already paid): send the confirmation.
   if (order.payment_status === PAID) {
+    order.status_name = 'Paid';
+    await order.save();
+    await clearCartFor(order);
+    await notifyOrderPlaced(order);
     sendInBackground(`order #${order.id} confirmation`, sendOrderConfirmation(order.id));
   }
   return { orderId: order.id, status: order.payment_status };
+}
+
+/** The cart is kept during online payment; empty it once the order is paid. */
+async function clearCartFor(order: any) {
+  const where = order.user_id ? { user_id: order.user_id } : order.fcm_token ? { fcm_token: order.fcm_token } : null;
+  if (where) await Cart.destroy({ where });
 }
 
 function pageUrl(kind: 'success' | 'fail', lang: string, orderId?: number): string {

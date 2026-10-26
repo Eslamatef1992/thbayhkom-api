@@ -88,21 +88,33 @@ async function buildOrder(params: {
 
   const adapter = paymentAdapterFor(paymentType);
   const pay = await adapter.createPayment(order, paymentType, req.ctx?.lang || 'en');
+  if (pay.error) {
+    // The gateway refused the charge: keep the order for the record, marked failed.
+    (order as any).payment_status = 2;
+    (order as any).status_name = 'Payment failed';
+    await order.save();
+    return { order, url: null, error: pay.error };
+  }
   if (pay.paymentId) (order as any).payment_id = pay.paymentId;
   await order.save();
 
-  await Notification.create({
-    user_id: req.authUser?.id || null, order_id: (order as any).id, messag_type: 'order',
-    title: 'Order placed', message: `Your order #${(order as any).id} has been placed.`, status: 'unread',
-  });
-
-  // Cash on delivery: confirm now. KNET/card: the confirmation is sent once the payment
-  // is verified (routes/payment.routes.ts), so customers never get it for an unpaid order.
+  // Cash on delivery: confirm now. KNET/card: the notification and confirmation email are
+  // sent once the payment is verified (routes/payment.routes.ts), never for an unpaid order.
   if (!pay.requiresRedirect) {
+    await notifyOrderPlaced(order);
     sendInBackground(`order #${(order as any).id} confirmation`, sendOrderConfirmation((order as any).id));
   }
 
-  return { order, url: pay.requiresRedirect ? pay.url : null };
+  return { order, url: pay.requiresRedirect ? pay.url ?? null : null, error: undefined as string | undefined };
+}
+
+/** In-app notification for a confirmed order (messag_type '1' = opens the order in the app). */
+export async function notifyOrderPlaced(order: any) {
+  if (!order.user_id) return;
+  await Notification.create({
+    user_id: order.user_id, order_id: order.id, messag_type: '1',
+    title: 'Order placed', message: `Your order #${order.id} has been placed.`, status: 'unread',
+  });
 }
 
 // --- Checkout (cart) ---
@@ -136,11 +148,14 @@ router.post('/checkOut', authOptional, asyncHandler(async (req: AuthedRequest, r
     service_type_id: c.service_type_id, special_request: c.special_request,
   }));
 
-  const { order, url } = await buildOrder({
+  const { order, url, error } = await buildOrder({
     req, items, addressId, guestContact, codeName: req.body.code_name, paymentType, cityIdForDelivery: cityId,
   });
+  if (error) return fail(res, 502, error); // cart kept so the customer can retry
 
-  await Cart.destroy({ where: scope });
+  // Online payments keep the cart until the payment is verified (payment.routes.ts clears it),
+  // so a failed or cancelled payment doesn't empty it.
+  if (!url) await Cart.destroy({ where: scope });
   ok(res, { order: presentOrder(order), url }, 'Order created');
 }));
 
@@ -166,7 +181,7 @@ router.post('/checkOutByProductId', authOptional, asyncHandler(async (req: Authe
     guestContact = { name: req.body.full_name, email: req.body.email, mobile: req.body.mobile };
   }
 
-  const { order, url } = await buildOrder({
+  const { order, url, error } = await buildOrder({
     req,
     items: [{
       product, quantity,
@@ -176,6 +191,7 @@ router.post('/checkOutByProductId', authOptional, asyncHandler(async (req: Authe
     }],
     addressId, guestContact, codeName: req.body.code_name, paymentType, cityIdForDelivery: cityId,
   });
+  if (error) return fail(res, 502, error);
 
   ok(res, { order: presentOrder(order), url }, 'Order created');
 }));

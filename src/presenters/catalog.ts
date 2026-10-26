@@ -6,11 +6,11 @@ import { localized } from '../utils/requestContext';
  */
 
 export function presentCategory(c: any) {
-  return { id: c.id, image: c.image, name: localized(c, 'name'), status: c.status, created_at: c.created_at };
+  return { id: c.id, image: c.image, name: localized(c, 'name'), status: c.status, created_at: c.created_at ?? c.createdAt };
 }
 
 export function presentTypes(t: any) {
-  return { id: t.id, status: t.status, created_at: t.created_at, name: localized(t, 'name') };
+  return { id: t.id, status: t.status, created_at: t.created_at ?? t.createdAt, name: localized(t, 'name') };
 }
 
 export function presentCity(c: any) {
@@ -19,7 +19,7 @@ export function presentCity(c: any) {
     deliveryCost: c.deliveryCost ?? c.delivery_cost ?? 0,
     country_id: c.country_id,
     status: c.status,
-    created_at: c.created_at,
+    created_at: c.created_at ?? c.createdAt,
     name: localized(c, 'name'),
     // Both names, so the app can match reverse-geocoded place names in either language.
     name_en: c.name_en || c.name,
@@ -36,7 +36,7 @@ export function presentCountry(c: any) {
     status: c.status,
     image: c.image,
     icon_url: c.icon_url ?? null,
-    created_at: c.created_at,
+    created_at: c.created_at ?? c.createdAt,
     name: localized(c, 'name'),
     translations: (c.translations || []).map((t: any) => ({
       id: t.id,
@@ -45,8 +45,8 @@ export function presentCountry(c: any) {
       name: t.name,
       currency_name: t.currency_name,
       deleted_at: t.deleted_at,
-      created_at: t.created_at,
-      updated_at: t.updated_at,
+      created_at: t.created_at ?? t.createdAt,
+      updated_at: t.updated_at ?? t.updatedAt,
     })),
   };
 }
@@ -59,7 +59,7 @@ export function presentBanner(b: any) {
     status: b.status,
     image: b.image,
     link: b.link,
-    created_at: b.created_at,
+    created_at: b.created_at ?? b.createdAt,
     category_name: b.category_name,
     video_url: b.video_url ?? null,
   };
@@ -79,7 +79,7 @@ export function presentProduct(p: any, opts: { isFavorite?: boolean; isCart?: nu
     is_featured: p.is_featured,
     quantity: p.quantity,
     status: p.status,
-    created_at: p.created_at,
+    created_at: p.created_at ?? p.createdAt,
     is_cart: opts.isCart ?? 0,
     discount_percent: p.discount_percent,
     is_fevorite: opts.isFavorite ? '1' : '0',
@@ -89,21 +89,21 @@ export function presentProduct(p: any, opts: { isFavorite?: boolean; isCart?: nu
       id: st.id,
       service_type_id: st.service_type_id,
       product_id: st.product_id,
-      created_at: st.created_at,
+      created_at: st.created_at ?? st.createdAt,
       service_type: st.service_type ? presentTypes(st.service_type) : null,
     })),
     cut_types: (p.cut_types || []).map((ct: any) => ({
       id: ct.id,
       cut_type_id: ct.cut_type_id,
       product_id: ct.product_id,
-      created_at: ct.created_at,
+      created_at: ct.created_at ?? ct.createdAt,
       cut_type: ct.cut_type ? presentTypes(ct.cut_type) : null,
     })),
     images: (p.images || []).map((im: any) => ({
       id: im.id,
       product_id: im.product_id,
       image: im.image,
-      created_at: im.created_at,
+      created_at: im.created_at ?? im.createdAt,
     })),
   };
 }
@@ -120,7 +120,7 @@ export function presentUser(u: any, accessToken?: string) {
     status: u.status,
     notification_status: u.notification_status,
     is_verified: u.is_verified,
-    created_at: u.created_at,
+    created_at: u.created_at ?? u.createdAt,
     access_token: accessToken ?? undefined,
   };
 }
