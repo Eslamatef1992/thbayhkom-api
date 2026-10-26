@@ -30,8 +30,12 @@ async function knetOrder(fcm: string) {
   });
   return res;
 }
+// Shaped like UPayments: its own internal order_id plus our requested_order_id/reference.
 const status = (orderId: number, result: string, total: number) =>
-  ({ status: true, data: { transaction: { result, requested_order_id: String(orderId), total_price: total, tran_id: 'T-' + orderId } } });
+  ({ status: true, data: { transaction: {
+    result, order_id: '01a1776f99dab00fa72c08a43f94324f', requested_order_id: String(orderId),
+    reference: `order-${orderId}`, total_price: total, tran_id: 'T-' + orderId,
+  } } });
 
 describe('UPayments flow', () => {
   it('checkout returns the gateway link and points callbacks at the backend', async () => {

@@ -40,9 +40,14 @@ async function settle(params: any): Promise<{ orderId?: number; status: number }
 
   if (!trackId) return { orderId: order.id, status: order.payment_status };
   const v = await verifyUPayment(trackId);
-  // Guard against a valid track_id from a different order being replayed onto this one.
-  if (v.orderId && v.orderId !== String(order.id)) {
-    console.warn(`[uPayments] track ${trackId} belongs to order ${v.orderId}, not ${order.id}`);
+  // Guard against a valid track_id from a different order being replayed onto this one:
+  // if UPayments echoes our reference back, it must be this order's.
+  const ours = [String(order.id), `order-${order.id}`];
+  const refs = v.merchantRefs.filter((r) => /^(order-)?\d+$/.test(r));
+  if (refs.length && !refs.some((r) => ours.includes(r))) {
+    console.warn(`[uPayments] track ${trackId} references ${refs.join(',')}, not order ${order.id}`);
+    order.payment_check_response = JSON.stringify(v.raw ?? null).slice(0, 20000);
+    await order.save();
     return { orderId: order.id, status: order.payment_status };
   }
   // A track_id can only pay for one order.
