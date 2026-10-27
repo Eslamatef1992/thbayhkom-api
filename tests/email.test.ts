@@ -79,4 +79,21 @@ describe('Mailgun emails', () => {
     await flush();
     expect(sent).toHaveLength(0);
   });
+
+  it('rejects sign-up with an invalid email (e.g. a double @)', async () => {
+    const res = await request(app).post('/api/signUp').type('form').send({
+      name: 'X', email: 'someone@@gmail.com', mobile: '96511111111', password: 'Pass@123', confirm_password: 'Pass@123',
+    });
+    expect(res.body.status).toBe(false);
+    expect(res.body.message).toBe('Please enter a valid email address');
+  });
+
+  it('stores sign-up emails lower-case and lets the user log in with any case', async () => {
+    const email = `Mixed${Date.now()}@Example.com`;
+    await request(app).post('/api/signUp').type('form').send({
+      name: 'M', email, mobile: '96522222222', password: 'Pass@123', confirm_password: 'Pass@123',
+    });
+    const login = await request(app).post('/api/login').type('form').send({ email, password: 'Pass@123' });
+    expect(login.body.user.email).toBe(email.toLowerCase());
+  });
 });

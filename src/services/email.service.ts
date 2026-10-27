@@ -58,7 +58,12 @@ const STATUS: Record<number, { en: string; ar: string; msgEn: string; msgAr: str
 const esc = (v: unknown) =>
   String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const kwd = (v: unknown) => `${Number(v || 0).toFixed(3)} KWD`;
-const isEmail = (v?: string | null): v is string => !!v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+export const isEmail = (v?: string | null): v is string => !!v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+function skipLog(what: string, to?: string | null) {
+  // eslint-disable-next-line no-console
+  if (process.env.NODE_ENV !== 'test') console.warn(`[email] skipped ${what}: invalid address "${to ?? ''}"`);
+}
 
 function layout(bodyHtml: string): string {
   return `
@@ -101,7 +106,7 @@ export function sendInBackground(label: string, p: Promise<unknown>): void {
 /* ------------------------------------------------------------------ */
 
 export async function sendWelcomeEmail(to: string | null | undefined, name?: string | null): Promise<boolean> {
-  if (!isEmail(to)) return false;
+  if (!isEmail(to)) { skipLog('welcome', to); return false; }
   const n = esc(name || '');
   return send(to, 'Welcome to Thabayehkom | أهلاً بك في ذبايحكم', layout(`
     <h2 style="color:${BRAND};margin-top:0">Welcome${n ? `, ${n}` : ''}!</h2>
@@ -126,7 +131,7 @@ async function loadOrder(orderId: number): Promise<any | null> {
 
 export async function sendOrderConfirmation(orderOrId: number | { id: number }): Promise<boolean> {
   const order = await loadOrder(typeof orderOrId === 'number' ? orderOrId : orderOrId.id);
-  if (!order || !isEmail(order.email)) return false;
+  if (!order || !isEmail(order.email)) { if (order) skipLog(`order #${order.id}`, order.email); return false; }
 
   const items: any[] = order.products || [];
   const itemRows = items.map((it) => {

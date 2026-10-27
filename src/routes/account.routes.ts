@@ -4,7 +4,7 @@ import { ok, fail } from '../utils/response';
 import { asyncHandler } from '../utils/http';
 import { authRequired, AuthedRequest } from '../middleware/auth';
 import { signToken, hashPassword, comparePassword } from '../services/auth';
-import { sendWelcomeEmail, sendInBackground } from '../services/email.service';
+import { sendWelcomeEmail, sendInBackground, isEmail } from '../services/email.service';
 import { presentUser } from '../presenters/catalog';
 
 const router = Router();
@@ -48,7 +48,9 @@ router.post('/login', asyncHandler(async (req, res) => {
   if (!login) return fail(res, 403, 'Login is currently disabled');
   const { email, password } = req.body;
   if (!email || !password) return fail(res, 400, 'Email and password are required');
-  const user = await User.findOne({ where: { email } });
+  // New accounts are stored lower-case; older ones may not be.
+  const typed = String(email).trim();
+  const user = (await User.findOne({ where: { email: typed.toLowerCase() } })) || (await User.findOne({ where: { email: typed } }));
   if (!user || !(await comparePassword(password, (user as any).password_hash))) {
     return fail(res, 401, 'Invalid email or password');
   }
@@ -59,8 +61,10 @@ router.post('/login', asyncHandler(async (req, res) => {
 router.post('/signUp', asyncHandler(async (req, res) => {
   const { register } = await flags();
   if (!register) return fail(res, 403, 'Registration is currently disabled');
-  const { name, email, mobile, password, confirm_password } = req.body;
+  const { name, mobile, password, confirm_password } = req.body;
+  const email = String(req.body.email || '').trim().toLowerCase();
   if (!name || !email || !mobile || !password) return fail(res, 400, 'All fields are required');
+  if (!isEmail(email)) return fail(res, 400, 'Please enter a valid email address');
   if (password !== confirm_password) return fail(res, 400, 'Passwords do not match');
   const exists = await User.findOne({ where: { email } });
   if (exists) return fail(res, 409, 'Email already registered');
@@ -152,10 +156,16 @@ router.post('/changePassword', authRequired, asyncHandler(async (req: AuthedRequ
 }));
 
 router.post('/editUserProfile', authRequired, asyncHandler(async (req: AuthedRequest, res) => {
-  const { name, mobile, email } = req.body;
+  const { name, mobile } = req.body;
+  const email = req.body.email ? String(req.body.email).trim().toLowerCase() : '';
+  if (email && email !== String(req.authUser.email || '').toLowerCase()) {
+    if (!isEmail(email)) return fail(res, 400, 'Please enter a valid email address');
+    const taken = await User.findOne({ where: { email } });
+    if (taken && (taken as any).id !== req.authUser.id) return fail(res, 409, 'Email already registered');
+    req.authUser.email = email;
+  }
   if (name) req.authUser.name = name;
   if (mobile) req.authUser.mobile = mobile;
-  if (email) req.authUser.email = email;
   await req.authUser.save();
   ok(res, { user: presentUser(req.authUser) }, 'Profile updated');
 }));
