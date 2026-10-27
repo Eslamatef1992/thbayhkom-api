@@ -78,9 +78,15 @@ const row = (label: string, value: string) =>
 
 async function send(to: string, subject: string, html: string, opts: { cc?: boolean } = {}): Promise<boolean> {
   const mg = getMailgun();
-  if (!mg) return false;
+  if (!mg) {
+    // eslint-disable-next-line no-console
+    if (process.env.NODE_ENV !== 'test') console.warn(`[email] skipped "${subject}" to ${to}: MAILGUN_API_KEY not set`);
+    return false;
+  }
   const cc = opts.cc ? CC().filter((c) => c.toLowerCase() !== to.toLowerCase()) : [];
-  await mg.messages.create(DOMAIN(), { from: FROM(), to: [to], ...(cc.length ? { cc } : {}), subject, html });
+  const r: any = await mg.messages.create(DOMAIN(), { from: FROM(), to: [to], ...(cc.length ? { cc } : {}), subject, html });
+  // eslint-disable-next-line no-console
+  if (process.env.NODE_ENV !== 'test') console.log(`[email] sent "${subject}" to ${to}${cc.length ? ` (cc ${cc.join(',')})` : ''} id=${r?.id ?? '-'}`);
   return true;
 }
 

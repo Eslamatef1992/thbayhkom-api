@@ -95,8 +95,10 @@ router.post('/socialCreateNewAccount', asyncHandler(async (req, res) => {
   if (!email) return fail(res, 401, 'Invalid social token');
   let user = await User.findOne({ where: { email } });
   if (!user) user = await User.create({ email, social_type, role: 'customer', status: 'active', is_verified: 1 });
+  const isNew = !(user as any).mobile;
   (user as any).mobile = mobile;
   await user.save();
+  if (isNew) sendInBackground(`welcome ${email}`, sendWelcomeEmail(email, (user as any).name));
   const token = signToken((user as any).id);
   ok(res, { user: presentUser(user, token) }, 'Account created');
 }));
@@ -121,9 +123,14 @@ router.post('/appleCreateNewAccount', asyncHandler(async (req, res) => {
   const resolvedEmail = email || `${apple_token}@apple.local`;
   let user = await User.findOne({ where: { email: resolvedEmail } });
   if (!user) user = await User.create({ email: resolvedEmail, name, social_type: 'apple', role: 'customer', status: 'active', is_verified: 1 });
+  const isNew = !(user as any).mobile;
   (user as any).mobile = mobile;
   if (name) (user as any).name = name;
   await user.save();
+  // Placeholder addresses (no email shared by Apple) are skipped.
+  if (isNew && !resolvedEmail.endsWith('@apple.local')) {
+    sendInBackground(`welcome ${resolvedEmail}`, sendWelcomeEmail(resolvedEmail, (user as any).name));
+  }
   const token = signToken((user as any).id);
   ok(res, { user: presentUser(user, token) }, 'Account created');
 }));
