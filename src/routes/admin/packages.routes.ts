@@ -9,7 +9,8 @@ import { adminAuth, requirePermission } from '../../middleware/adminAuth';
 /**
  * Admin CRUD for packages. Body:
  *   { name, name_ar, description, description_ar, image, price_before, price_after,
- *     status, sort_order, products: [{ product_id, quantity }] }
+ *     status, sort_order, features, features_ar (one per line), badge, badge_ar,
+ *     products: [{ product_id, quantity }] }
  */
 const router = Router();
 const VIEW = 'packages.view';
@@ -18,6 +19,7 @@ const MANAGE = 'packages.manage';
 const include = [{ model: PackageProduct, as: 'items', include: [{ model: Product, as: 'product' }] }];
 
 function fields(b: any) {
+  const text = (v: any) => (v == null || String(v).trim() === '' ? null : String(v).trim());
   const num = (v: any) => (v === '' || v === null || v === undefined ? null : Number(v));
   return {
     name: b.name, name_ar: b.name_ar ?? null,
@@ -26,6 +28,8 @@ function fields(b: any) {
     price_before: num(b.price_before), price_after: num(b.price_after) ?? 0,
     status: b.status === 'inactive' ? 'inactive' : 'active',
     sort_order: num(b.sort_order) ?? 0,
+    features: text(b.features), features_ar: text(b.features_ar),
+    badge: text(b.badge), badge_ar: text(b.badge_ar),
   };
 }
 

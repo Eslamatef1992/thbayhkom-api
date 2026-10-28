@@ -135,6 +135,9 @@ export function presentPackage(pkg: any) {
     name_en: pkg.name,
     name_ar: pkg.name_ar ?? null,
     description: localized(pkg, 'description'),
+    /** Feature lines for the package card (admin enters one per line). */
+    features: String(localized(pkg, 'features') ?? '').split(/\r?\n/).map((l) => l.replace(/^[\s•\-*✓]+/, '').trim()).filter(Boolean),
+    badge: localized(pkg, 'badge') || null,
     image: pkg.image,
     price_before: before,
     price_after: after,

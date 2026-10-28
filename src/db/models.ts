@@ -463,6 +463,10 @@ Package.init(
     price_after: { type: DataTypes.FLOAT, defaultValue: 0 },  // what the customer pays
     status: { type: DataTypes.STRING, defaultValue: 'active' },
     sort_order: { type: DataTypes.INTEGER, defaultValue: 0 },
+    features: { type: DataTypes.TEXT, allowNull: true },    // one feature per line
+    features_ar: { type: DataTypes.TEXT, allowNull: true },
+    badge: { type: DataTypes.STRING, allowNull: true },     // e.g. "Best seller"
+    badge_ar: { type: DataTypes.STRING, allowNull: true },
   },
   { sequelize, modelName: 'package', tableName: 'packages' }
 );

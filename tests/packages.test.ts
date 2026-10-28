@@ -72,6 +72,20 @@ describe('Packages', () => {
     expect(d.body.item.products[0].product.name).toBeTruthy();
   });
 
+  it('features and badge are localized for the package cards', async () => {
+    const created = await makePackage({
+      name: 'Whole lamb', features: 'Fresh meat\n• Serves 24\n\n', features_ar: 'لحم طازج\nتكفى 24 شخص',
+      badge: 'Best seller', badge_ar: 'الأكثر مبيعا',
+    });
+    const id = created.body.data.id;
+    const ar = (await request(app).get(`/api/getPackageDetails/${id}`).set('Accept-Language', 'ar')).body.item;
+    expect(ar.features).toEqual(['لحم طازج', 'تكفى 24 شخص']);
+    expect(ar.badge).toBe('الأكثر مبيعا');
+    const en = (await request(app).get(`/api/getPackageDetails/${id}`)).body.item;
+    expect(en.features).toEqual(['Fresh meat', 'Serves 24']);
+    expect(en.badge).toBe('Best seller');
+  });
+
   it('package goes through cart and checkout at the package price', async () => {
     const id = (await makePackage()).body.data.id;
     const fcm = { fcmToken: 'pkg-guest' };
