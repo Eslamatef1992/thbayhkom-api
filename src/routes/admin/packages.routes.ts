@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Op } from 'sequelize';
-import { Package, PackageProduct, Product } from '../../db/models';
+import { Extra, Package, PackageExtra, PackageProduct, Product } from '../../db/models';
 import { sequelize } from '../../db/sequelize';
 import { adminOk, adminFail } from '../../utils/response';
 import { asyncHandler } from '../../utils/http';
@@ -10,13 +10,16 @@ import { adminAuth, requirePermission } from '../../middleware/adminAuth';
  * Admin CRUD for packages. Body:
  *   { name, name_ar, description, description_ar, image, price_before, price_after,
  *     status, sort_order, features, features_ar (one per line), badge, badge_ar,
- *     products: [{ product_id, quantity }] }
+ *     products: [{ product_id, quantity }], extra_ids: [1, 3] (add-ons customers can tick) }
  */
 const router = Router();
 const VIEW = 'packages.view';
 const MANAGE = 'packages.manage';
 
-const include = [{ model: PackageProduct, as: 'items', include: [{ model: Product, as: 'product' }] }];
+const include = [
+  { model: PackageProduct, as: 'items', include: [{ model: Product, as: 'product' }] },
+  { model: Extra, as: 'extras', through: { attributes: [] } },
+];
 
 function fields(b: any) {
   const text = (v: any) => (v == null || String(v).trim() === '' ? null : String(v).trim());
@@ -55,6 +58,15 @@ async function setProducts(pkgId: number, products: any[], t: any) {
   }
 }
 
+/** Replace the package's add-ons. `undefined` leaves them unchanged. */
+async function setExtras(pkgId: number, extraIds: unknown, t: any) {
+  if (extraIds === undefined) return;
+  const ids = [...new Set((Array.isArray(extraIds) ? extraIds : []).map((x) => Number(x)).filter((n) => n > 0))];
+  const valid = ids.length ? (await Extra.findAll({ where: { id: { [Op.in]: ids } }, transaction: t })).map((e: any) => e.id) : [];
+  await PackageExtra.destroy({ where: { package_id: pkgId }, transaction: t });
+  for (const id of valid) await PackageExtra.create({ package_id: pkgId, extra_id: id }, { transaction: t });
+}
+
 async function productsExist(products: any[]): Promise<boolean> {
   const ids = [...new Set(products.map((p) => Number(p.product_id)).filter(Boolean))];
   return ids.length > 0 && (await Product.count({ where: { id: { [Op.in]: ids } } })) === ids.length;
@@ -83,6 +95,7 @@ router.post('/', adminAuth, requirePermission(MANAGE), asyncHandler(async (req, 
   const id = await sequelize.transaction(async (t) => {
     const pkg: any = await Package.create(fields(req.body), { transaction: t });
     await setProducts(pkg.id, req.body.products, t);
+    await setExtras(pkg.id, req.body.extra_ids, t);
     return pkg.id;
   });
   adminOk(res, await Package.findByPk(id, { include }));
@@ -97,6 +110,7 @@ router.put('/:id', adminAuth, requirePermission(MANAGE), asyncHandler(async (req
   await sequelize.transaction(async (t) => {
     await pkg.update(fields(req.body), { transaction: t });
     await setProducts(pkg.id, req.body.products, t);
+    await setExtras(pkg.id, req.body.extra_ids, t);
   });
   adminOk(res, await Package.findByPk(pkg.id, { include }));
 }));
@@ -106,6 +120,7 @@ router.delete('/:id', adminAuth, requirePermission(MANAGE), asyncHandler(async (
   if (!pkg) return adminFail(res, 404, 'Package not found');
   await sequelize.transaction(async (t) => {
     await PackageProduct.destroy({ where: { package_id: pkg.id }, transaction: t });
+    await PackageExtra.destroy({ where: { package_id: pkg.id }, transaction: t });
     await pkg.destroy({ transaction: t });
   });
   adminOk(res, { deleted: true });

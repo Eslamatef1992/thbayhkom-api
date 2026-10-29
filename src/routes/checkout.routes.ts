@@ -1,8 +1,9 @@
 import { sendOrderConfirmation, sendInBackground } from '../services/email.service';
 import { Router } from 'express';
 import {
-  Cart, Product, Order, OrderProduct, Address, PromotionCode, City, Notification, Package,
+  Cart, Product, Order, OrderProduct, Address, PromotionCode, City, Notification, Package, Extra,
 } from '../db/models';
+import { chosenExtras, extrasSnapshot, extrasTotal, parseExtraIds } from '../services/extras';
 import { ok, fail } from '../utils/response';
 import { asyncHandler, getPage, paginate } from '../utils/http';
 import { authRequired, authOptional, AuthedRequest } from '../middleware/auth';
@@ -43,10 +44,18 @@ async function guestAddress(b: any) {
 }
 
 /** A product line, or a package line (`packageId` set; `product` then holds its prices). */
-interface LineItem { product: any; packageId?: number; quantity: number; cut_type_id?: number; service_type_id?: number; special_request?: string; }
+interface LineItem {
+  product: any; packageId?: number; quantity: number; cut_type_id?: number; service_type_id?: number; special_request?: string;
+  /** Package add-ons chosen (already included in `product` prices). */
+  extras?: any[];
+}
 
-/** Pricing view of a package: customers pay price_after (price_before kept for reference). */
-const packagePricing = (pkg: any) => ({ id: null, price: pkg.price_before ?? pkg.price_after, discount_price: pkg.price_after });
+/** Pricing view of a package: customers pay price_after + chosen add-ons (price_before kept for reference). */
+const packagePricing = (pkg: any, extras: any[] = []) => {
+  const add = extrasTotal(extras);
+  const after = Number(pkg.price_after ?? 0) + add;
+  return { id: null, price: (pkg.price_before != null ? Number(pkg.price_before) + add : after), discount_price: after };
+};
 
 async function buildOrder(params: {
   req: AuthedRequest;
@@ -83,6 +92,8 @@ async function buildOrder(params: {
       cut_type_id: it.cut_type_id || null, service_type_id: it.service_type_id || null,
       special_request: it.special_request || null, quantity: it.quantity,
       price: it.product.price, offer_price: it.product.discount_price ?? null, discount: 0,
+      extras: it.extras?.length ? JSON.stringify(extrasSnapshot(it.extras)) : null,
+      extras_total: extrasTotal(it.extras || []),
     });
   }
 
@@ -121,7 +132,13 @@ export async function notifyOrderPlaced(order: any) {
 router.post('/checkOut', authOptional, asyncHandler(async (req: AuthedRequest, res) => {
   const paymentType = parseInt(req.body.payment_type, 10) || 3;
   const scope = req.authUser?.id ? { user_id: req.authUser.id } : { fcm_token: req.ctx?.fcmToken || 'anonymous' };
-  const cartItems = await Cart.findAll({ where: scope, include: [{ model: Product, as: 'product' }, { model: Package, as: 'package' }] });
+  const cartItems = await Cart.findAll({
+    where: scope,
+    include: [
+      { model: Product, as: 'product' },
+      { model: Package, as: 'package', include: [{ model: Extra, as: 'extras', through: { attributes: [] } }] },
+    ],
+  });
   // Skip lines whose product/package was deleted since it was added.
   const validItems = cartItems.filter((c: any) => c.product || c.package);
   if (!validItems.length) return fail(res, 422, 'Your cart is empty');
@@ -141,12 +158,17 @@ router.post('/checkOut', authOptional, asyncHandler(async (req: AuthedRequest, r
     guestContact = { name: req.body.full_name, email: req.body.email, mobile: req.body.mobile };
   }
 
-  const items: LineItem[] = validItems.map((c: any) => ({
-    product: c.package ? packagePricing(c.package) : c.product,
+  const items: LineItem[] = validItems.map((c: any) => {
+    // Prices come from the database: removed/disabled add-ons are dropped, never charged.
+    const extras = c.package ? chosenExtras(c.package, parseExtraIds(c.extra_ids)) : [];
+    return {
+    product: c.package ? packagePricing(c.package, extras) : c.product,
     packageId: c.package ? c.package.id : undefined,
+    extras,
     quantity: c.quantity, cut_type_id: c.cut_type_id,
     service_type_id: c.service_type_id, special_request: c.special_request,
-  }));
+    };
+  });
 
   const { order, url, error } = await buildOrder({
     req, items, addressId, guestContact, codeName: req.body.code_name, paymentType, cityIdForDelivery: cityId,

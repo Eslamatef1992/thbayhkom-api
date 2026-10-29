@@ -258,6 +258,7 @@ Cart.init(
     country_id: { type: DataTypes.INTEGER, allowNull: true },
     special_request: { type: DataTypes.STRING, allowNull: true },
     package_id: { type: DataTypes.INTEGER, allowNull: true }, // set instead of product_id for a package line
+    extra_ids: { type: DataTypes.TEXT, allowNull: true },     // package add-ons chosen, JSON "[1,3]"
   },
   { sequelize, modelName: 'cart', tableName: 'carts' }
 );
@@ -323,6 +324,8 @@ OrderProduct.init(
     price: { type: DataTypes.FLOAT, defaultValue: 0 },
     offer_price: { type: DataTypes.FLOAT, allowNull: true },
     package_id: { type: DataTypes.INTEGER, allowNull: true }, // set instead of product_id for a package line
+    extras: { type: DataTypes.TEXT, allowNull: true },          // JSON snapshot [{id,name,name_ar,price}]
+    extras_total: { type: DataTypes.FLOAT, defaultValue: 0 },   // per unit
   },
   { sequelize, modelName: 'order_product', tableName: 'order_products' }
 );
@@ -471,6 +474,29 @@ Package.init(
   { sequelize, modelName: 'package', tableName: 'packages' }
 );
 
+export class Extra extends Model {}
+Extra.init(
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    name: { type: DataTypes.STRING },
+    name_ar: { type: DataTypes.STRING, allowNull: true },
+    price: { type: DataTypes.FLOAT, defaultValue: 0 }, // 0 = free
+    status: { type: DataTypes.STRING, defaultValue: 'active' },
+    sort_order: { type: DataTypes.INTEGER, defaultValue: 0 },
+  },
+  { sequelize, modelName: 'extra', tableName: 'extras' }
+);
+
+export class PackageExtra extends Model {}
+PackageExtra.init(
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    package_id: { type: DataTypes.INTEGER },
+    extra_id: { type: DataTypes.INTEGER },
+  },
+  { sequelize, modelName: 'package_extra', tableName: 'package_extras' }
+);
+
 export class PackageProduct extends Model {}
 PackageProduct.init(
   {
@@ -520,4 +546,6 @@ Package.hasMany(PackageProduct, { as: 'items', foreignKey: 'package_id' });
 PackageProduct.belongsTo(Package, { foreignKey: 'package_id' });
 PackageProduct.belongsTo(Product, { as: 'product', foreignKey: 'product_id' });
 Cart.belongsTo(Package, { as: 'package', foreignKey: 'package_id' });
+Package.belongsToMany(Extra, { through: PackageExtra, as: 'extras', foreignKey: 'package_id', otherKey: 'extra_id' });
+Extra.belongsToMany(Package, { through: PackageExtra, as: 'packages', foreignKey: 'extra_id', otherKey: 'package_id' });
 OrderProduct.belongsTo(Package, { as: 'package', foreignKey: 'package_id' });

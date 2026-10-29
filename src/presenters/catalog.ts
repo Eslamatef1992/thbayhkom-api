@@ -1,3 +1,4 @@
+import { availableExtras } from '../services/extras';
 import { localized } from '../utils/requestContext';
 
 /**
@@ -126,6 +127,12 @@ export function presentUser(u: any, accessToken?: string) {
 }
 
 /** Package for the app. price_after is what the customer pays; price_before is shown struck through. */
+/** A package add-on. price 0 = free. */
+export function presentExtra(e: any) {
+  const price = Math.max(0, Number(e.price) || 0);
+  return { id: e.id, name: localized(e, 'name'), name_en: e.name, name_ar: e.name_ar ?? null, price, is_free: price === 0 };
+}
+
 export function presentPackage(pkg: any) {
   const before = pkg.price_before != null ? Number(pkg.price_before) : null;
   const after = Number(pkg.price_after ?? 0);
@@ -144,6 +151,11 @@ export function presentPackage(pkg: any) {
     discount_percent: before && before > after ? Math.round(((before - after) / before) * 100) : 0,
     status: pkg.status,
     created_at: pkg.created_at ?? pkg.createdAt,
+    /** Add-ons the customer can tick (free or paid). */
+    extras: availableExtras(pkg)
+      .slice()
+      .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id)
+      .map(presentExtra),
     products: (pkg.items || []).map((it: any) => ({
       id: it.id,
       product_id: it.product_id,
@@ -157,12 +169,15 @@ export function presentPackage(pkg: any) {
  * Product-shaped view of a package, so cart/checkout screens that render `product`
  * can show a package line unchanged (price = before, discount_price = after).
  */
-export function packageAsProduct(pkg: any) {
+export function packageAsProduct(pkg: any, addOns = 0) {
+  // Chosen add-ons are part of the line's unit price.
+  const after = Number(pkg.price_after ?? 0) + addOns;
+  const before = pkg.price_before != null ? Number(pkg.price_before) + addOns : null;
   return {
     ...presentProduct({
       id: pkg.id, image: pkg.image, name: pkg.name, name_ar: pkg.name_ar,
       description: pkg.description, description_ar: pkg.description_ar,
-      price: pkg.price_before ?? pkg.price_after, discount_price: pkg.price_before != null ? pkg.price_after : null,
+      price: before ?? after, discount_price: before != null ? after : null,
       quantity: 9999, status: pkg.status,
     }),
     is_package: true,
