@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  Cart, Product, CutType, ServiceType, City, PromotionCode, Package, Extra,
+  Cart, Product, CutType, ServiceType, City, PromotionCode, Package, Extra, PackageType,
 } from '../db/models';
 import { chosenExtras, extrasTotal, parseExtraIds } from '../services/extras';
 import { ok, fail } from '../utils/response';
@@ -22,7 +22,7 @@ const cartInclude = [
   { model: Product, as: 'product' },
   { model: CutType, as: 'cut_type' },
   { model: ServiceType, as: 'service_type' },
-  { model: Package, as: 'package', include: [{ model: Extra, as: 'extras', through: { attributes: [] } }] },
+  { model: Package, as: 'package', include: [{ model: Extra, as: 'extras', through: { attributes: [] } }, { model: PackageType, as: 'types', through: { attributes: [] } }] },
 ];
 
 function lineTotal(item: any): number {

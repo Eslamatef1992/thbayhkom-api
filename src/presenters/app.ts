@@ -1,5 +1,5 @@
-import { chosenExtras, extrasTotal, parseExtraIds, parseSnapshot } from '../services/extras';
-import { presentProduct, presentPackage, packageAsProduct, presentExtra } from './catalog';
+import { chosenExtras, chosenType, extrasTotal, parseExtraIds, parseSnapshot, parseTypeSnapshot } from '../services/extras';
+import { presentProduct, presentPackage, packageAsProduct, presentExtra, presentType } from './catalog';
 import { localized } from '../utils/requestContext';
 
 export function presentSetting(s: any, pages: any[], cutTypes: any[], serviceTypes: any[]) {
@@ -126,6 +126,8 @@ export function presentCartItem(c: any) {
     product: c.product ? presentProduct(c.product) : c.package ? packageAsProduct(c.package, extrasTotal(chosen)) : null,
     package_id: c.package_id ?? null,
     package: c.package ? presentPackage(c.package) : null,
+    /** Type chosen for a package line (e.g. Naimi). */
+    package_type: c.package ? (chosenType(c.package, c.package_type_id) ? presentType(chosenType(c.package, c.package_type_id)) : null) : null,
     /** Add-ons chosen for a package line (prices included in product.price). */
     extras: chosen.map(presentExtra),
     extras_total: extrasTotal(chosen),
@@ -181,6 +183,8 @@ export function presentOrderDetails(o: any) {
       product: op.product ? presentProduct(op.product) : op.package ? packageAsProduct(op.package, Number(op.extras_total) || 0) : null,
       package_id: op.package_id ?? null,
       package: op.package ? presentPackage(op.package) : null,
+      /** Type as ordered. */
+      package_type: (() => { const t = parseTypeSnapshot(op.package_type); return t ? { id: t.id, name: localized(t, 'name') } : null; })(),
       /** Add-ons as ordered (names/prices at the time of the order). */
       extras: parseSnapshot(op.extras).map((e) => ({ id: e.id, name: localized(e, 'name'), price: e.price, is_free: !e.price })),
       extras_total: Number(op.extras_total) || 0,

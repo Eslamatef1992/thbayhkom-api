@@ -1,7 +1,7 @@
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { Order, OrderProduct, Product, Package } from '../db/models';
-import { parseSnapshot } from './extras';
+import { parseSnapshot, parseTypeSnapshot } from './extras';
 
 /**
  * Transactional email via Mailgun (bilingual EN/AR).
@@ -139,11 +139,13 @@ export async function sendOrderConfirmation(orderOrId: number | { id: number }):
     const p = it.product || (it.package ? { name: `📦 ${it.package.name}`, name_ar: it.package.name_ar } : {});
     const unit = it.offer_price ?? it.price;
     const name = [p.name || p.name_en, p.name_ar].filter(Boolean).map(esc).join(' / ') || `#${it.product_id}`;
+    const pt = parseTypeSnapshot(it.package_type);
+    const typeLine = pt ? `Type | النوع: ${esc(pt.name)}${pt.name_ar ? ` / ${esc(pt.name_ar)}` : ''}` : '';
     const addOns = parseSnapshot(it.extras)
       .map((e) => `+ ${esc(e.name)}${e.name_ar ? ` / ${esc(e.name_ar)}` : ''} (${e.price ? kwd(e.price) : 'Free | مجاني'})`)
       .join('<br>');
     return `<tr>
-      <td style="padding:8px;border:1px solid #eee">${name}${addOns ? `<br><small style="color:#555">${addOns}</small>` : ''}${it.special_request ? `<br><small style="color:#888">${esc(it.special_request)}</small>` : ''}</td>
+      <td style="padding:8px;border:1px solid #eee">${name}${typeLine ? `<br><small style="color:#555">${typeLine}</small>` : ''}${addOns ? `<br><small style="color:#555">${addOns}</small>` : ''}${it.special_request ? `<br><small style="color:#888">${esc(it.special_request)}</small>` : ''}</td>
       <td style="padding:8px;border:1px solid #eee;text-align:center">${esc(it.quantity)}</td>
       <td style="padding:8px;border:1px solid #eee;text-align:right">${kwd(unit * it.quantity)}</td>
     </tr>`;

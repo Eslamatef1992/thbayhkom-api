@@ -259,6 +259,7 @@ Cart.init(
     special_request: { type: DataTypes.STRING, allowNull: true },
     package_id: { type: DataTypes.INTEGER, allowNull: true }, // set instead of product_id for a package line
     extra_ids: { type: DataTypes.TEXT, allowNull: true },     // package add-ons chosen, JSON "[1,3]"
+    package_type_id: { type: DataTypes.INTEGER, allowNull: true }, // package type chosen
   },
   { sequelize, modelName: 'cart', tableName: 'carts' }
 );
@@ -326,6 +327,8 @@ OrderProduct.init(
     package_id: { type: DataTypes.INTEGER, allowNull: true }, // set instead of product_id for a package line
     extras: { type: DataTypes.TEXT, allowNull: true },          // JSON snapshot [{id,name,name_ar,price}]
     extras_total: { type: DataTypes.FLOAT, defaultValue: 0 },   // per unit
+    package_type_id: { type: DataTypes.INTEGER, allowNull: true },
+    package_type: { type: DataTypes.TEXT, allowNull: true },    // JSON snapshot {id,name,name_ar}
   },
   { sequelize, modelName: 'order_product', tableName: 'order_products' }
 );
@@ -470,6 +473,7 @@ Package.init(
     features_ar: { type: DataTypes.TEXT, allowNull: true },
     badge: { type: DataTypes.STRING, allowNull: true },     // e.g. "Best seller"
     badge_ar: { type: DataTypes.STRING, allowNull: true },
+    has_types: { type: DataTypes.BOOLEAN, defaultValue: false }, // customer must pick one of its types
   },
   { sequelize, modelName: 'package', tableName: 'packages' }
 );
@@ -485,6 +489,28 @@ Extra.init(
     sort_order: { type: DataTypes.INTEGER, defaultValue: 0 },
   },
   { sequelize, modelName: 'extra', tableName: 'extras' }
+);
+
+export class PackageType extends Model {}
+PackageType.init(
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    name: { type: DataTypes.STRING },
+    name_ar: { type: DataTypes.STRING, allowNull: true },
+    status: { type: DataTypes.STRING, defaultValue: 'active' },
+    sort_order: { type: DataTypes.INTEGER, defaultValue: 0 },
+  },
+  { sequelize, modelName: 'package_type', tableName: 'package_types' }
+);
+
+export class PackageTypeLink extends Model {}
+PackageTypeLink.init(
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    package_id: { type: DataTypes.INTEGER },
+    type_id: { type: DataTypes.INTEGER },
+  },
+  { sequelize, modelName: 'package_type_link', tableName: 'package_type_links' }
 );
 
 export class PackageExtra extends Model {}
@@ -548,4 +574,6 @@ PackageProduct.belongsTo(Product, { as: 'product', foreignKey: 'product_id' });
 Cart.belongsTo(Package, { as: 'package', foreignKey: 'package_id' });
 Package.belongsToMany(Extra, { through: PackageExtra, as: 'extras', foreignKey: 'package_id', otherKey: 'extra_id' });
 Extra.belongsToMany(Package, { through: PackageExtra, as: 'packages', foreignKey: 'extra_id', otherKey: 'package_id' });
+Package.belongsToMany(PackageType, { through: PackageTypeLink, as: 'types', foreignKey: 'package_id', otherKey: 'type_id' });
+PackageType.belongsToMany(Package, { through: PackageTypeLink, as: 'packages', foreignKey: 'type_id', otherKey: 'package_id' });
 OrderProduct.belongsTo(Package, { as: 'package', foreignKey: 'package_id' });

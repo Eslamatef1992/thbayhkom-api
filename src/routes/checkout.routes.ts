@@ -1,9 +1,9 @@
 import { sendOrderConfirmation, sendInBackground } from '../services/email.service';
 import { Router } from 'express';
 import {
-  Cart, Product, Order, OrderProduct, Address, PromotionCode, City, Notification, Package, Extra,
+  Cart, Product, Order, OrderProduct, Address, PromotionCode, City, Notification, Package, Extra, PackageType,
 } from '../db/models';
-import { chosenExtras, extrasSnapshot, extrasTotal, parseExtraIds } from '../services/extras';
+import { availableTypes, chosenExtras, chosenType, extrasSnapshot, extrasTotal, parseExtraIds, typeSnapshot } from '../services/extras';
 import { ok, fail } from '../utils/response';
 import { asyncHandler, getPage, paginate } from '../utils/http';
 import { authRequired, authOptional, AuthedRequest } from '../middleware/auth';
@@ -48,6 +48,8 @@ interface LineItem {
   product: any; packageId?: number; quantity: number; cut_type_id?: number; service_type_id?: number; special_request?: string;
   /** Package add-ons chosen (already included in `product` prices). */
   extras?: any[];
+  /** Package type chosen (e.g. Naimi). */
+  packageType?: any;
 }
 
 /** Pricing view of a package: customers pay price_after + chosen add-ons (price_before kept for reference). */
@@ -94,6 +96,8 @@ async function buildOrder(params: {
       price: it.product.price, offer_price: it.product.discount_price ?? null, discount: 0,
       extras: it.extras?.length ? JSON.stringify(extrasSnapshot(it.extras)) : null,
       extras_total: extrasTotal(it.extras || []),
+      package_type_id: it.packageType?.id ?? null,
+      package_type: it.packageType ? JSON.stringify(typeSnapshot(it.packageType)) : null,
     });
   }
 
@@ -136,7 +140,7 @@ router.post('/checkOut', authOptional, asyncHandler(async (req: AuthedRequest, r
     where: scope,
     include: [
       { model: Product, as: 'product' },
-      { model: Package, as: 'package', include: [{ model: Extra, as: 'extras', through: { attributes: [] } }] },
+      { model: Package, as: 'package', include: [{ model: Extra, as: 'extras', through: { attributes: [] } }, { model: PackageType, as: 'types', through: { attributes: [] } }] },
     ],
   });
   // Skip lines whose product/package was deleted since it was added.
@@ -158,6 +162,12 @@ router.post('/checkOut', authOptional, asyncHandler(async (req: AuthedRequest, r
     guestContact = { name: req.body.full_name, email: req.body.email, mobile: req.body.mobile };
   }
 
+  // A package that offers types needs one chosen (it may have been removed since it was added).
+  const missingType = validItems.find((c: any) => c.package && availableTypes(c.package).length && !chosenType(c.package, c.package_type_id));
+  if (missingType) {
+    return fail(res, 422, `Please choose a type for "${(missingType as any).package.name}" (remove it from the cart and add it again)`);
+  }
+
   const items: LineItem[] = validItems.map((c: any) => {
     // Prices come from the database: removed/disabled add-ons are dropped, never charged.
     const extras = c.package ? chosenExtras(c.package, parseExtraIds(c.extra_ids)) : [];
@@ -165,6 +175,7 @@ router.post('/checkOut', authOptional, asyncHandler(async (req: AuthedRequest, r
     product: c.package ? packagePricing(c.package, extras) : c.product,
     packageId: c.package ? c.package.id : undefined,
     extras,
+    packageType: c.package ? chosenType(c.package, c.package_type_id) : null,
     quantity: c.quantity, cut_type_id: c.cut_type_id,
     service_type_id: c.service_type_id, special_request: c.special_request,
     };

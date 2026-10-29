@@ -1,4 +1,4 @@
-import { availableExtras } from '../services/extras';
+import { availableExtras, availableTypes } from '../services/extras';
 import { localized } from '../utils/requestContext';
 
 /**
@@ -127,6 +127,11 @@ export function presentUser(u: any, accessToken?: string) {
 }
 
 /** Package for the app. price_after is what the customer pays; price_before is shown struck through. */
+/** A package type (e.g. Naimi). */
+export function presentType(t: any) {
+  return { id: t.id, name: localized(t, 'name'), name_en: t.name, name_ar: t.name_ar ?? null };
+}
+
 /** A package add-on. price 0 = free. */
 export function presentExtra(e: any) {
   const price = Math.max(0, Number(e.price) || 0);
@@ -151,6 +156,9 @@ export function presentPackage(pkg: any) {
     discount_percent: before && before > after ? Math.round(((before - after) / before) * 100) : 0,
     status: pkg.status,
     created_at: pkg.created_at ?? pkg.createdAt,
+    /** When true the customer must pick one of `types` (shown before the add-ons). */
+    has_types: availableTypes(pkg).length > 0,
+    types: availableTypes(pkg).map(presentType),
     /** Add-ons the customer can tick (free or paid). */
     extras: availableExtras(pkg)
       .slice()

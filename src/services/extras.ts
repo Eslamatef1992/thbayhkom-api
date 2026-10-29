@@ -47,3 +47,30 @@ export function parseSnapshot(v: unknown): Array<{ id: number; name: string; nam
   if (!v) return [];
   try { const j = typeof v === 'string' ? JSON.parse(v) : v; return Array.isArray(j) ? j : []; } catch { return []; }
 }
+
+/* ---------------------------------------------------------------- types */
+
+/** Active types a package offers (needs the package loaded with `types`); none unless has_types. */
+export function availableTypes(pkg: any): any[] {
+  if (!pkg?.has_types) return [];
+  return (pkg.types || [])
+    .filter((t: any) => (t.status ?? 'active') === 'active')
+    .slice()
+    .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id);
+}
+
+/** The chosen type if it is still offered, else null. */
+export function chosenType(pkg: any, typeId: unknown): any | null {
+  const id = parseInt(String(typeId ?? ''), 10);
+  if (!id) return null;
+  return availableTypes(pkg).find((t: any) => Number(t.id) === id) || null;
+}
+
+export function typeSnapshot(t: any) {
+  return t ? { id: t.id, name: t.name, name_ar: t.name_ar ?? null } : null;
+}
+
+export function parseTypeSnapshot(v: unknown): { id: number; name: string; name_ar: string | null } | null {
+  if (!v) return null;
+  try { const j = typeof v === 'string' ? JSON.parse(v) : v; return j && typeof j === 'object' ? j : null; } catch { return null; }
+}
